@@ -1,0 +1,110 @@
+module StyleCapsule
+  VERSION: String
+
+  module CssProcessor
+    def self.scope_selectors: (String css_string, String capsule_id) -> String
+    def self.scope_with_nesting: (String css_string, String capsule_id) -> String
+    def self.strip_comments: (String css) -> String
+  end
+
+  class CssFileWriter
+    def self.configure: (?output_dir: String | Pathname, ?filename_pattern: Proc, ?enabled: bool) -> void
+    def self.write_css: (css_content: String, component_class: Class, capsule_id: String) -> String?
+    def self.file_exists?: (component_class: Class, capsule_id: String) -> bool
+    def self.file_path_for: (component_class: Class, capsule_id: String) -> String?
+    def self.ensure_output_directory: () -> void
+    def self.clear_files: () -> void
+    def self.enabled?: () -> bool
+  end
+
+  class StylesheetRegistry < ActiveSupport::CurrentAttributes
+    DEFAULT_NAMESPACE: Symbol
+
+    def self.normalize_namespace: (Symbol | String | nil namespace) -> Symbol
+    def self.register: (String file_path, ?namespace: Symbol | String | nil, **Hash[untyped, untyped] options) -> void
+    def self.register_inline: (String css_content, ?namespace: Symbol | String | nil, ?capsule_id: String | nil, ?cache_key: String | nil, ?cache_strategy: Symbol, ?cache_ttl: Integer | nil, ?cache_proc: Proc | nil, ?component_class: Class | nil, ?stylesheet_link_options: Hash[untyped, untyped] | nil) -> void
+    def self.cached_inline: (String cache_key, cache_strategy: Symbol, ?cache_ttl: Integer | nil, ?cache_proc: Proc | nil, ?css_content: String | nil, ?capsule_id: String | nil, ?namespace: Symbol | nil) -> String | nil
+    def self.cache_inline_css: (String cache_key, String css_content, cache_strategy: Symbol, ?cache_ttl: Integer | nil, ?cache_proc: Proc | nil, ?capsule_id: String | nil, ?namespace: Symbol | nil) -> void
+    def self.clear_inline_cache: (?String cache_key) -> void
+    def self.cleanup_expired_cache: () -> Integer
+    def self.manifest_files: () -> Hash[Symbol, Set[Hash[Symbol, untyped]]]
+    def self.request_inline_stylesheets: () -> Hash[Symbol, Array[Hash[Symbol, untyped]]]
+    def self.stylesheets_for: (?namespace: Symbol | String | nil) -> Array[Hash[Symbol, untyped]]
+    def self.clear: (?namespace: Symbol | String | nil) -> void
+    def self.clear_manifest: (?namespace: Symbol | String | nil) -> void
+    def self.render_head_stylesheets: (?ActionView::Base | nil view_context, ?namespace: Symbol | String | nil) -> String
+    def self.any?: (?namespace: Symbol | String | nil) -> bool
+  end
+
+  module Component
+    module ClassMethods
+      def css_cache: () -> Hash[String, String]
+      def clear_css_cache: () -> void
+      def capsule_id: () -> String | nil
+      def capsule_id: (String capsule_id) -> String
+      def head_injection!: () -> void
+      def head_injection?: () -> bool
+      def stylesheet_namespace: () -> Symbol | String | nil
+      def stylesheet_namespace: (Symbol | String | nil namespace) -> Symbol | String | nil
+      def custom_capsule_id: () -> String | nil
+      def inline_cache_strategy: () -> Symbol | nil
+      def inline_cache_strategy: (Symbol strategy, ?ttl: Integer | nil, ?cache_proc: Proc | nil) -> Symbol
+      def inline_cache_ttl: () -> Integer | nil
+      def inline_cache_proc: () -> Proc | nil
+      def stylesheet_link_options: () -> Hash[untyped, untyped] | nil
+      def stylesheet_link_options: (Hash[untyped, untyped] options) -> Hash[untyped, untyped]
+      def css_scoping_strategy: () -> Symbol
+      def css_scoping_strategy: (Symbol strategy) -> Symbol
+    end
+
+    def component_capsule: () -> String
+    def head_injection?: () -> bool
+  end
+
+  module ViewComponent
+    module ClassMethods
+      def css_cache: () -> Hash[String, String]
+      def clear_css_cache: () -> void
+      def capsule_id: () -> String | nil
+      def capsule_id: (String capsule_id) -> String
+      def head_injection!: () -> void
+      def head_injection?: () -> bool
+      def stylesheet_namespace: () -> Symbol | String | nil
+      def stylesheet_namespace: (Symbol | String | nil namespace) -> Symbol | String | nil
+      def custom_capsule_id: () -> String | nil
+      def inline_cache_strategy: () -> Symbol | nil
+      def inline_cache_strategy: (Symbol strategy, ?ttl: Integer | nil, ?cache_proc: Proc | nil) -> Symbol
+      def inline_cache_ttl: () -> Integer | nil
+      def inline_cache_proc: () -> Proc | nil
+      def stylesheet_link_options: () -> Hash[untyped, untyped] | nil
+      def stylesheet_link_options: (Hash[untyped, untyped] options) -> Hash[untyped, untyped]
+      def css_scoping_strategy: () -> Symbol
+      def css_scoping_strategy: (Symbol strategy) -> Symbol
+    end
+
+    def component_capsule: () -> String
+    def head_injection?: () -> bool
+  end
+
+  module ViewComponentHelper
+    def register_stylesheet: (String file_path, ?namespace: Symbol | String | nil, **Hash[untyped, untyped] options) -> void
+    def stylesheet_registrymap_tags: (?namespace: Symbol | String | nil) -> String
+  end
+
+  module Helper
+    def generate_capsule_id: (String css_content) -> String
+    def scope_css: (String css_content, String capsule_id) -> String
+    def style_capsule: (?String css_content, ?capsule_id: String | nil) { () -> String } -> String
+    def register_stylesheet: (String file_path, ?namespace: Symbol | String | nil, **Hash[untyped, untyped] options) -> void
+    def stylesheet_registrymap_tags: (?namespace: Symbol | String | nil) -> String
+  end
+
+  module PhlexHelper
+    def register_stylesheet: (String file_path, ?namespace: Symbol | String | nil, **Hash[untyped, untyped] options) -> void
+    def stylesheet_registrymap_tags: (?namespace: Symbol | String | nil) -> void
+  end
+
+  class Railtie < Rails::Railtie
+  end
+end
+
