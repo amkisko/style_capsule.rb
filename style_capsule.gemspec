@@ -44,5 +44,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "memory_profiler", "~> 1"
   spec.add_development_dependency "rbs", "~> 3"
   spec.add_development_dependency "phlex-rails", "~> 2.0"  # For testing Phlex integration
-  spec.add_development_dependency "view_component", "~> 2.0"  # For testing ViewComponent integration
+  spec.add_development_dependency "view_component", "~> 4.0"  # For testing ViewComponent integration
 end

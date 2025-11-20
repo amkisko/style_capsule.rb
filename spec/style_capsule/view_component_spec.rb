@@ -189,6 +189,8 @@ RSpec.describe StyleCapsule::ViewComponent do
             @view_context_double
           end
         end
+        # Give base class a name for ViewComponent 4.x compatibility
+        Object.const_set("BaseClass_#{base_class.object_id}", base_class) unless base_class.name
 
         # Create a child class that doesn't set its own strategy
         child_class = Class.new(base_class) do
@@ -196,6 +198,8 @@ RSpec.describe StyleCapsule::ViewComponent do
             ".test { color: red; }"
           end
         end
+        # Give child class a name for ViewComponent 4.x compatibility
+        Object.const_set("ChildClass_#{child_class.object_id}", child_class) unless child_class.name
 
         # Child should inherit nesting strategy from parent
         expect(child_class.css_scoping_strategy).to eq(:nesting)
@@ -226,6 +230,8 @@ RSpec.describe StyleCapsule::ViewComponent do
             @view_context_double
           end
         end
+        # Give base class a name for ViewComponent 4.x compatibility
+        Object.const_set("BaseClassOverride_#{base_class.object_id}", base_class) unless base_class.name
 
         # Create a child class that overrides with selector_patching
         child_class = Class.new(base_class) do
@@ -235,6 +241,8 @@ RSpec.describe StyleCapsule::ViewComponent do
             ".test { color: red; }"
           end
         end
+        # Give child class a name for ViewComponent 4.x compatibility
+        Object.const_set("ChildClassOverride_#{child_class.object_id}", child_class) unless child_class.name
 
         # Child should use its own strategy, not parent's
         expect(child_class.css_scoping_strategy).to eq(:selector_patching)
