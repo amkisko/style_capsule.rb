@@ -1,6 +1,6 @@
 # style_capsule
 
-[![Gem Version](https://badge.fury.io/rb/style_capsule.svg)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml)
+[![Gem Version](https://badge.fury.io/rb/style_capsule.svg?v=1.0.0)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/amkisko/style_capsule.rb/graph/badge.svg?token=2U6NXJOVVM)](https://codecov.io/gh/amkisko/style_capsule.rb)
 
 CSS scoping extension for Rails components. Provides attribute-based style encapsulation for Phlex, ViewComponent, and ERB templates to prevent style leakage between components. Includes configurable caching strategies for optimal performance.
 
