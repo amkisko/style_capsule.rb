@@ -21,12 +21,23 @@ namespace :style_capsule do
     end
 
     # Find ViewComponent components
-    if defined?(ViewComponent::Base)
-      ObjectSpace.each_object(Class) do |klass|
-        if klass < ViewComponent::Base && klass.included_modules.include?(StyleCapsule::ViewComponent)
-          component_classes << klass
+    # Wrap in begin/rescue to handle ViewComponent loading errors (e.g., version compatibility issues)
+    begin
+      if defined?(ViewComponent::Base)
+        ObjectSpace.each_object(Class) do |klass|
+          if klass < ViewComponent::Base && klass.included_modules.include?(StyleCapsule::ViewComponent)
+            component_classes << klass
+          end
+        rescue
+          # Skip this class if checking inheritance triggers ViewComponent loading errors
+          # (e.g., ViewComponent 2.83.0 has a bug with Gem::Version#to_f)
+          next
         end
       end
+    rescue
+      # ViewComponent may have loading issues (e.g., version compatibility)
+      # Silently skip ViewComponent components if there's an error
+      # This allows the rake task to continue with Phlex components
     end
 
     # Generate CSS files for each component
