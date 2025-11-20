@@ -293,8 +293,8 @@ end
 ## Requirements
 
 - Ruby >= 3.0
-- Rails >= 6.0, < 9.0
-- ActiveSupport >= 6.0, < 9.0
+- Rails >= 7.0, < 9.0
+- ActiveSupport >= 7.0, < 9.0
 
 ## Development
 
@@ -306,7 +306,6 @@ bundle exec appraisal install
 bundle exec rspec
 
 # Run tests for all Rails versions
-bundle exec appraisal rails6 rspec
 bundle exec appraisal rails72 rspec
 bundle exec appraisal rails8ruby34 rspec
 
