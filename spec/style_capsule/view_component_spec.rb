@@ -73,7 +73,7 @@ RSpec.describe StyleCapsule::ViewComponent do
   describe "inclusion" do
     it "extends class with ClassMethods" do
       expect(component_class).to respond_to(:capsule_id)
-      expect(component_class).to respond_to(:head_injection!)
+      expect(component_class).to respond_to(:stylesheet_registry)
       expect(component_class).to respond_to(:css_cache)
     end
 
@@ -258,24 +258,23 @@ RSpec.describe StyleCapsule::ViewComponent do
     end
   end
 
-  describe "head injection" do
+  describe "head rendering" do
     it "renders styles in body by default" do
-      expect(component_class.head_injection?).to be false
+      expect(component_class.head_rendering?).to be false
     end
 
-    it "registers for head injection when enabled" do
-      component_class.head_injection!
-      expect(component_class.head_injection?).to be true
+    it "registers for head rendering when enabled" do
+      component_class.stylesheet_registry
+      expect(component_class.head_rendering?).to be true
     end
 
-    it "supports namespace for head injection" do
-      component_class.head_injection!
-      component_class.stylesheet_namespace(:admin)
+    it "supports namespace for head rendering" do
+      component_class.stylesheet_registry namespace: :admin
       expect(component_class.stylesheet_namespace).to eq(:admin)
     end
 
-    it "registers inline CSS for head injection when enabled" do
-      component_class.head_injection!
+    it "registers inline CSS for head rendering when enabled" do
+      component_class.stylesheet_registry
       StyleCapsule::StylesheetRegistry.clear
 
       instance = component_class.new
@@ -285,7 +284,7 @@ RSpec.describe StyleCapsule::ViewComponent do
       expect(StyleCapsule::StylesheetRegistry.any?).to be true
     end
 
-    it "renders style tag in body when head injection is disabled" do
+    it "renders style tag in body when head rendering is disabled" do
       StyleCapsule::StylesheetRegistry.clear
       instance = component_class.new
       instance.view_context_double = view_context_double
@@ -294,7 +293,7 @@ RSpec.describe StyleCapsule::ViewComponent do
 
       expect(output).to include("<style")
       expect(output).to include("text/css")
-      # Inline CSS is registered for head injection, so registry has content
+      # Inline CSS is registered for head rendering, so registry has content
       expect(StyleCapsule::StylesheetRegistry.any?).to be true
     end
   end
@@ -559,8 +558,7 @@ RSpec.describe StyleCapsule::ViewComponent do
             @view_context = view_context
           end
 
-          head_injection!
-          inline_cache_strategy :file
+          stylesheet_registry cache_strategy: :file
 
           def self.component_styles
             ".file-cached { color: orange; }"
@@ -590,8 +588,7 @@ RSpec.describe StyleCapsule::ViewComponent do
         component_class_instance = Class.new(ViewComponent::Base) do
           include StyleCapsule::ViewComponent
 
-          head_injection!
-          inline_cache_strategy :file
+          stylesheet_registry cache_strategy: :file
 
           def initialize(view_context: nil)
             @view_context = view_context

@@ -55,7 +55,7 @@ bin/rspec spec/integration/view_component_integration_spec.rb
 Integration tests verify:
 - Real component rendering with actual Phlex/ViewComponent gems
 - CSS scoping works correctly in real components
-- Head injection functionality
+- Head rendering functionality
 - Cache strategies
 - Helper methods work with real view contexts
 - Scope ID generation and consistency

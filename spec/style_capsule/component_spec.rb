@@ -57,7 +57,7 @@ RSpec.describe StyleCapsule::Component do
   describe "inclusion" do
     it "extends class with ClassMethods" do
       expect(component_class).to respond_to(:capsule_id)
-      expect(component_class).to respond_to(:head_injection!)
+      expect(component_class).to respond_to(:stylesheet_registry)
       expect(component_class).to respond_to(:css_cache)
     end
 
@@ -212,7 +212,7 @@ RSpec.describe StyleCapsule::Component do
     end
   end
 
-  describe "head injection" do
+  describe "head rendering" do
     it "renders styles in body by default" do
       component_class.class_eval do
         def view_template
@@ -226,22 +226,52 @@ RSpec.describe StyleCapsule::Component do
         end
       end
 
-      expect(component_class.head_injection?).to be false
+      expect(component_class.head_rendering?).to be false
     end
 
-    it "registers for head injection when enabled" do
-      component_class.head_injection!
-      expect(component_class.head_injection?).to be true
+    it "registers for head rendering when enabled" do
+      component_class.stylesheet_registry
+      expect(component_class.head_rendering?).to be true
     end
 
-    it "supports namespace for head injection" do
-      component_class.head_injection!
-      component_class.stylesheet_namespace(:admin)
+    it "supports namespace for head rendering" do
+      component_class.stylesheet_registry namespace: :admin
       expect(component_class.stylesheet_namespace).to eq(:admin)
     end
 
-    it "registers inline CSS for head injection when enabled" do
-      component_class.head_injection!
+    it "accepts string cache_strategy" do
+      component_class.stylesheet_registry cache_strategy: "time", cache_ttl: 3600
+      expect(component_class.inline_cache_strategy).to eq(:time)
+      expect(component_class.inline_cache_ttl).to eq(3600)
+    end
+
+    it "accepts ActiveSupport::Duration for cache_ttl" do
+      component_class.stylesheet_registry cache_strategy: :time, cache_ttl: 1.hour
+      expect(component_class.inline_cache_strategy).to eq(:time)
+      expect(component_class.inline_cache_ttl).to eq(1.hour)
+      # Verify it works with Time addition
+      expires_at = Time.current + component_class.inline_cache_ttl
+      expect(expires_at).to be_a(Time)
+      expect(expires_at).to be > Time.current
+    end
+
+    it "accepts proc as cache_strategy" do
+      cache_proc = ->(css, capsule_id, namespace) {
+        ["key_#{capsule_id}", css.length > 50, Time.current + 1800]
+      }
+      component_class.stylesheet_registry cache_strategy: cache_proc
+      expect(component_class.inline_cache_strategy).to eq(:proc)
+      expect(component_class.inline_cache_proc).to eq(cache_proc)
+    end
+
+    it "rejects invalid cache_strategy" do
+      expect {
+        component_class.stylesheet_registry cache_strategy: :invalid
+      }.to raise_error(ArgumentError, /cache_strategy must be/)
+    end
+
+    it "registers inline CSS for head rendering when enabled" do
+      component_class.stylesheet_registry
       StyleCapsule::StylesheetRegistry.clear
 
       instance = component_class.new
@@ -250,7 +280,7 @@ RSpec.describe StyleCapsule::Component do
       expect(StyleCapsule::StylesheetRegistry.any?).to be true
     end
 
-    it "renders style tag in body when head injection is disabled" do
+    it "renders style tag in body when head rendering is disabled" do
       StyleCapsule::StylesheetRegistry.clear
       StyleCapsule::StylesheetRegistry.clear_manifest
       StyleCapsule::StylesheetRegistry.clear_inline_cache
@@ -498,8 +528,7 @@ RSpec.describe StyleCapsule::Component do
         component_class_file = Class.new do
           include StyleCapsule::Component
 
-          head_injection!
-          inline_cache_strategy :file
+          stylesheet_registry cache_strategy: :file
 
           def self.component_styles
             ".file-cached { color: orange; }"
@@ -529,8 +558,7 @@ RSpec.describe StyleCapsule::Component do
         component_class_instance = Class.new do
           include StyleCapsule::Component
 
-          head_injection!
-          inline_cache_strategy :file
+          stylesheet_registry cache_strategy: :file
 
           def component_styles
             ".instance { color: purple; }"

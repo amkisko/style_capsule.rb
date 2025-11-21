@@ -19,7 +19,7 @@ module StyleCapsule
   #     div { "Content" }
   #   end
   module PhlexHelper
-    # Register a stylesheet file for head injection
+    # Register a stylesheet file for head rendering
     #
     # Usage in Phlex components:
     #   def view_template

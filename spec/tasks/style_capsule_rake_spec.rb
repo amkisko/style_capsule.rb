@@ -97,8 +97,7 @@ RSpec.describe "style_capsule rake tasks" do
         component_class = create_phlex_component("PhlexFileCache") do
           include StyleCapsule::Component
 
-          head_injection!
-          inline_cache_strategy :file
+          stylesheet_registry cache_strategy: :file
 
           def self.component_styles
             ".test-component { color: red; }"
@@ -133,8 +132,7 @@ RSpec.describe "style_capsule rake tasks" do
         component_class = create_phlex_component("PhlexGenerated") do
           include StyleCapsule::Component
 
-          head_injection!
-          inline_cache_strategy :file
+          stylesheet_registry cache_strategy: :file
 
           def self.component_styles
             ".generated { color: blue; }"
@@ -186,8 +184,7 @@ RSpec.describe "style_capsule rake tasks" do
         component_class = create_phlex_component("PhlexError") do
           include StyleCapsule::Component
 
-          head_injection!
-          inline_cache_strategy :file
+          stylesheet_registry cache_strategy: :file
 
           def initialize(required_arg = nil)
             raise ArgumentError, "required_arg is required" if required_arg.nil?
@@ -261,8 +258,7 @@ RSpec.describe "style_capsule rake tasks" do
         component_class = create_phlex_component("PhlexInstanceMethod") do
           include StyleCapsule::Component
 
-          head_injection!
-          inline_cache_strategy :file
+          stylesheet_registry cache_strategy: :file
 
           # Instance method, not class method
           def component_styles
@@ -302,8 +298,7 @@ RSpec.describe "style_capsule rake tasks" do
         component_class = create_view_component("ViewComponentFileCache") do
           include StyleCapsule::ViewComponent
 
-          head_injection!
-          inline_cache_strategy :file
+          stylesheet_registry cache_strategy: :file
 
           def self.component_styles
             ".view-component { color: green; }"

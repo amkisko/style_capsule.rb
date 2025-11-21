@@ -72,8 +72,7 @@ require "active_support/core_ext/string"
 # @example File-Based Caching (HTTP Caching)
 #   class MyComponent < ApplicationComponent
 #     include StyleCapsule::Component
-#     head_injection!
-#     inline_cache_strategy :file  # Writes CSS to files for HTTP caching
+#     stylesheet_registry cache_strategy: :file  # Writes CSS to files for HTTP caching
 #   end
 #
 #   # CSS files are written to app/assets/build/capsules/

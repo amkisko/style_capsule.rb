@@ -1,6 +1,6 @@
 # style_capsule
 
-[![Gem Version](https://badge.fury.io/rb/style_capsule.svg?v=1.0.0)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/amkisko/style_capsule.rb/graph/badge.svg?token=2U6NXJOVVM)](https://codecov.io/gh/amkisko/style_capsule.rb)
+[![Gem Version](https://badge.fury.io/rb/style_capsule.svg?v=1.0.1)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/amkisko/style_capsule.rb/graph/badge.svg?token=2U6NXJOVVM)](https://codecov.io/gh/amkisko/style_capsule.rb)
 
 CSS scoping extension for Rails components. Provides attribute-based style encapsulation for Phlex, ViewComponent, and ERB templates to prevent style leakage between components. Includes configurable caching strategies for optimal performance.
 
@@ -26,11 +26,9 @@ Then run `bundle install`.
 - **Phlex, ViewComponent, and ERB support** with automatic Rails integration
 - **Per-component-type scope IDs** (shared across instances)
 - **CSS Nesting support** (optional, more performant, requires modern browsers)
-- **Head injection** with thread-safe stylesheet registry and namespace support
+- **Stylesheet registry** with thread-safe head rendering, namespace support, and compatibility with Propshaft and other asset bundlers
 - **Multiple cache strategies**: none, time-based, custom proc, and file-based (HTTP caching)
-- **Database-stored CSS support** with manual scoping
 - **Security protections**: path traversal protection, input validation, size limits
-- **Comprehensive test coverage** (>93%)
 
 ## Usage
 
@@ -127,15 +125,29 @@ end
 MyComponent.clear_css_cache
 ```
 
-## Head Injection
+## Stylesheet Registry
 
-For better performance, register styles for head injection instead of rendering `<style>` tags in the body:
+For better performance, register styles for head rendering instead of rendering `<style>` tags in the body:
 
 ```ruby
 class MyComponent < ApplicationComponent
   include StyleCapsule::Component
-  head_injection!
-  stylesheet_namespace :admin  # Optional namespace
+  stylesheet_registry namespace: :admin  # Optional namespace
+
+  def component_styles
+    <<~CSS
+      .section { color: red; }
+    CSS
+  end
+end
+```
+
+With cache strategy:
+
+```ruby
+class MyComponent < ApplicationComponent
+  include StyleCapsule::Component
+  stylesheet_registry namespace: :admin, cache_strategy: :time, cache_ttl: 1.hour
 
   def component_styles
     <<~CSS
@@ -162,6 +174,39 @@ head do
 end
 ```
 
+### Registering Stylesheet Files
+
+You can also register external stylesheet files (not inline CSS) for head rendering:
+
+**In ERB:**
+
+```erb
+<% register_stylesheet("stylesheets/user/order_select_component", "data-turbo-track": "reload") %>
+<% register_stylesheet("stylesheets/admin/dashboard", namespace: :admin) %>
+```
+
+**In Phlex (requires including `StyleCapsule::PhlexHelper`):**
+
+```ruby
+def view_template
+  register_stylesheet("stylesheets/user/order_select_component", "data-turbo-track": "reload")
+  register_stylesheet("stylesheets/admin/dashboard", namespace: :admin)
+  div { "Content" }
+end
+```
+
+**In ViewComponent (requires including `StyleCapsule::ViewComponentHelper`):**
+
+```ruby
+def call
+  register_stylesheet("stylesheets/user/order_select_component", "data-turbo-track": "reload")
+  register_stylesheet("stylesheets/admin/dashboard", namespace: :admin)
+  content_tag(:div, "Content")
+end
+```
+
+Registered files are rendered via `stylesheet_registrymap_tags` in your layout, just like inline CSS.
+
 ## Caching Strategies
 
 ### No Caching (Default)
@@ -169,29 +214,30 @@ end
 ```ruby
 class MyComponent < ApplicationComponent
   include StyleCapsule::Component
-  head_injection!
-  # No cache strategy set (default: :none)
+  stylesheet_registry  # No cache strategy set (default: :none)
 end
 ```
 
 ### Time-Based Caching
 
 ```ruby
-head_injection!
-inline_cache_strategy :time, ttl: 3600  # Cache for 1 hour
+stylesheet_registry cache_strategy: :time, cache_ttl: 1.hour  # Using ActiveSupport::Duration
+# Or using integer seconds:
+stylesheet_registry cache_strategy: :time, cache_ttl: 3600  # Cache for 1 hour
 ```
 
 ### Custom Proc Caching
 
 ```ruby
-head_injection!
-inline_cache_strategy :proc, cache_proc: ->(css, capsule_id, namespace) {
+stylesheet_registry cache_strategy: ->(css, capsule_id, namespace) {
   cache_key = "css_#{capsule_id}_#{namespace}"
   should_cache = css.length > 100
   expires_at = Time.now + 1800
   [cache_key, should_cache, expires_at]
 }
 ```
+
+**Note:** `cache_strategy` accepts Symbol (`:time`), String (`"time"`), or Proc. Strings are automatically converted to symbols.
 
 ### File-Based Caching (HTTP Caching)
 
@@ -200,8 +246,7 @@ Writes CSS to files for HTTP caching. **Requires class method `def self.componen
 ```ruby
 class MyComponent < ApplicationComponent
   include StyleCapsule::Component
-  head_injection!
-  inline_cache_strategy :file
+  stylesheet_registry cache_strategy: :file
 
   # Must use class method for file caching
   def self.component_styles
@@ -233,7 +278,11 @@ bin/rails style_capsule:clear  # Clear generated files
 
 Files are automatically built during `bin/rails assets:precompile`.
 
-## Database-Stored CSS
+**Compatibility:** The stylesheet registry works with Propshaft, Sprockets, and other Rails asset bundlers. Static file paths are collected in a process-wide manifest (similar to Propshaft's approach), while inline CSS is stored per-request.
+
+## Advanced Usage
+
+### Database-Stored CSS
 
 For CSS stored in a database (e.g., user-generated styles, themes), use StyleCapsule's CSS processor directly:
 

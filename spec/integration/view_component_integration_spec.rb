@@ -172,20 +172,20 @@ RSpec.describe "StyleCapsule ViewComponent Integration", type: :integration do
       expect(scoped_css).to include(%([data-capsule="#{scope}"] .heading:hover))
     end
 
-    context "with head injection" do
+    context "with head rendering" do
       before do
-        component_class.head_injection!
+        component_class.stylesheet_registry
         StyleCapsule::StylesheetRegistry.clear
       end
 
-      it "registers CSS for head injection instead of rendering in body" do
+      it "registers CSS for head rendering instead of rendering in body" do
         component = component_class.new(view_context: view_context)
         output = component.call.to_s
 
         # Should not include style tag in body
         expect(output).not_to include("<style")
 
-        # Should register for head injection
+        # Should register for head rendering
         expect(StyleCapsule::StylesheetRegistry.any?).to be true
       end
 
@@ -278,8 +278,7 @@ RSpec.describe "StyleCapsule ViewComponent Integration", type: :integration do
       klass.class_eval do
         include StyleCapsule::ViewComponent
 
-        head_injection!
-        inline_cache_strategy :time, ttl: 3600
+        stylesheet_registry cache_strategy: :time, cache_ttl: 3600
 
         def component_styles
           ".cached { color: green; }"
@@ -328,8 +327,7 @@ RSpec.describe "StyleCapsule ViewComponent Integration", type: :integration do
       klass.class_eval do
         include StyleCapsule::ViewComponent
 
-        head_injection!
-        inline_cache_strategy :proc, cache_proc: cache_proc
+        stylesheet_registry cache_strategy: :proc, cache_proc: cache_proc
 
         def component_styles
           ".proc-cached { color: purple; }" * 10 # Make it long enough to cache
@@ -372,8 +370,7 @@ RSpec.describe "StyleCapsule ViewComponent Integration", type: :integration do
           @view_context = view_context
         end
 
-        head_injection!
-        inline_cache_strategy :file
+        stylesheet_registry cache_strategy: :file
 
         # File caching requires class method component_styles
         def self.component_styles

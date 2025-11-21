@@ -134,7 +134,7 @@ module StyleCapsule
       (style_tag + wrapped_content).html_safe
     end
 
-    # Register a stylesheet file for head injection
+    # Register a stylesheet file for head rendering
     #
     # Usage in ERB:
     #   <% register_stylesheet("stylesheets/user/my_component", "data-turbo-track": "reload") %>

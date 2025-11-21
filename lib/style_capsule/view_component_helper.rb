@@ -19,7 +19,7 @@ module StyleCapsule
   #     content_tag(:div, "Content")
   #   end
   module ViewComponentHelper
-    # Register a stylesheet file for head injection
+    # Register a stylesheet file for head rendering
     #
     # Usage in ViewComponent components:
     #   def call

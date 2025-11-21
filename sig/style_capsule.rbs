@@ -22,9 +22,9 @@ module StyleCapsule
 
     def self.normalize_namespace: (Symbol | String | nil namespace) -> Symbol
     def self.register: (String file_path, ?namespace: Symbol | String | nil, **Hash[untyped, untyped] options) -> void
-    def self.register_inline: (String css_content, ?namespace: Symbol | String | nil, ?capsule_id: String | nil, ?cache_key: String | nil, ?cache_strategy: Symbol, ?cache_ttl: Integer | nil, ?cache_proc: Proc | nil, ?component_class: Class | nil, ?stylesheet_link_options: Hash[untyped, untyped] | nil) -> void
-    def self.cached_inline: (String cache_key, cache_strategy: Symbol, ?cache_ttl: Integer | nil, ?cache_proc: Proc | nil, ?css_content: String | nil, ?capsule_id: String | nil, ?namespace: Symbol | nil) -> String | nil
-    def self.cache_inline_css: (String cache_key, String css_content, cache_strategy: Symbol, ?cache_ttl: Integer | nil, ?cache_proc: Proc | nil, ?capsule_id: String | nil, ?namespace: Symbol | nil) -> void
+    def self.register_inline: (String css_content, ?namespace: Symbol | String | nil, ?capsule_id: String | nil, ?cache_key: String | nil, ?cache_strategy: Symbol, ?cache_ttl: Integer | ActiveSupport::Duration | nil, ?cache_proc: Proc | nil, ?component_class: Class | nil, ?stylesheet_link_options: Hash[untyped, untyped] | nil) -> void
+    def self.cached_inline: (String cache_key, cache_strategy: Symbol, ?cache_ttl: Integer | ActiveSupport::Duration | nil, ?cache_proc: Proc | nil, ?css_content: String | nil, ?capsule_id: String | nil, ?namespace: Symbol | nil) -> String | nil
+    def self.cache_inline_css: (String cache_key, String css_content, cache_strategy: Symbol, ?cache_ttl: Integer | ActiveSupport::Duration | nil, ?cache_proc: Proc | nil, ?capsule_id: String | nil, ?namespace: Symbol | nil) -> void
     def self.clear_inline_cache: (?String cache_key) -> void
     def self.cleanup_expired_cache: () -> Integer
     def self.manifest_files: () -> Hash[Symbol, Set[Hash[Symbol, untyped]]]
@@ -42,14 +42,14 @@ module StyleCapsule
       def clear_css_cache: () -> void
       def capsule_id: () -> String | nil
       def capsule_id: (String capsule_id) -> String
-      def head_injection!: () -> void
-      def head_injection?: () -> bool
+      def stylesheet_registry: (?namespace: Symbol | String | nil, ?cache_strategy: Symbol, ?cache_ttl: Integer | ActiveSupport::Duration | nil, ?cache_proc: Proc | nil) -> void
+      def head_rendering!: () -> void  # deprecated
+      def head_rendering?: () -> bool
       def stylesheet_namespace: () -> Symbol | String | nil
-      def stylesheet_namespace: (Symbol | String | nil namespace) -> Symbol | String | nil
       def custom_capsule_id: () -> String | nil
       def inline_cache_strategy: () -> Symbol | nil
       def inline_cache_strategy: (Symbol strategy, ?ttl: Integer | nil, ?cache_proc: Proc | nil) -> Symbol
-      def inline_cache_ttl: () -> Integer | nil
+      def inline_cache_ttl: () -> Integer | ActiveSupport::Duration | nil
       def inline_cache_proc: () -> Proc | nil
       def stylesheet_link_options: () -> Hash[untyped, untyped] | nil
       def stylesheet_link_options: (Hash[untyped, untyped] options) -> Hash[untyped, untyped]
@@ -58,7 +58,7 @@ module StyleCapsule
     end
 
     def component_capsule: () -> String
-    def head_injection?: () -> bool
+    def head_rendering?: () -> bool
   end
 
   module ViewComponent
@@ -67,14 +67,14 @@ module StyleCapsule
       def clear_css_cache: () -> void
       def capsule_id: () -> String | nil
       def capsule_id: (String capsule_id) -> String
-      def head_injection!: () -> void
-      def head_injection?: () -> bool
+      def stylesheet_registry: (?namespace: Symbol | String | nil, ?cache_strategy: Symbol, ?cache_ttl: Integer | ActiveSupport::Duration | nil, ?cache_proc: Proc | nil) -> void
+      def head_rendering!: () -> void  # deprecated
+      def head_rendering?: () -> bool
       def stylesheet_namespace: () -> Symbol | String | nil
-      def stylesheet_namespace: (Symbol | String | nil namespace) -> Symbol | String | nil
       def custom_capsule_id: () -> String | nil
       def inline_cache_strategy: () -> Symbol | nil
       def inline_cache_strategy: (Symbol strategy, ?ttl: Integer | nil, ?cache_proc: Proc | nil) -> Symbol
-      def inline_cache_ttl: () -> Integer | nil
+      def inline_cache_ttl: () -> Integer | ActiveSupport::Duration | nil
       def inline_cache_proc: () -> Proc | nil
       def stylesheet_link_options: () -> Hash[untyped, untyped] | nil
       def stylesheet_link_options: (Hash[untyped, untyped] options) -> Hash[untyped, untyped]
@@ -83,7 +83,7 @@ module StyleCapsule
     end
 
     def component_capsule: () -> String
-    def head_injection?: () -> bool
+    def head_rendering?: () -> bool
   end
 
   module ViewComponentHelper

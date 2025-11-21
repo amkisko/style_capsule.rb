@@ -36,8 +36,7 @@ module StyleCapsule
   #
   #   class MyComponent < ApplicationComponent
   #     include StyleCapsule::ViewComponent
-  #     head_injection!
-  #     inline_cache_strategy :file  # File caching requires class method
+  #     stylesheet_registry cache_strategy: :file  # File caching requires class method
   #
   #     def self.component_styles
   #       <<~CSS
@@ -128,78 +127,49 @@ module StyleCapsule
         end
       end
 
-      # Configure component to use head injection instead of body <style> tags
+      # Configure stylesheet registry for head rendering
       #
-      # @example
+      # Enables head rendering and configures namespace and cache strategy in a single call.
+      # All parameters are optional - calling without arguments enables head rendering with defaults.
+      #
+      # @param namespace [Symbol, String, nil] Namespace identifier (nil/blank uses default)
+      # @param cache_strategy [Symbol, String, Proc, nil] Cache strategy: :none (default), :time, :proc, :file
+      #   - Symbol or String: :none, :time, :proc, :file (or "none", "time", "proc", "file")
+      #   - Proc: Custom cache proc (automatically uses :proc strategy)
+      #     Proc receives: (css_content, capsule_id, namespace) and should return [cache_key, should_cache, expires_at]
+      # @param cache_ttl [Integer, ActiveSupport::Duration, nil] Time-to-live in seconds (for :time strategy). Supports ActiveSupport::Duration (e.g., 1.hour, 30.minutes)
+      # @param cache_proc [Proc, nil] Custom cache proc (for :proc strategy, ignored if cache_strategy is a Proc)
+      #   Proc receives: (css_content, capsule_id, namespace) and should return [cache_key, should_cache, expires_at]
+      # @return [void]
+      # @example Basic usage (enables head rendering with defaults)
       #   class MyComponent < ApplicationComponent
       #     include StyleCapsule::ViewComponent
-      #     head_injection!
+      #     stylesheet_registry
       #   end
-      def head_injection!
-        @use_head_injection = true
-      end
-
-      # Check if component uses head injection
-      def head_injection?
-        return false unless defined?(@use_head_injection)
-        @use_head_injection
-      end
-
-      # Set or get a namespace for stylesheet registry (for head injection)
-      #
-      # @param namespace [Symbol, String, nil] Namespace identifier (nil/blank uses default, omit to get current value)
-      # @return [Symbol, String, nil] The current namespace if no argument provided
-      # @example Setting a namespace
+      # @example With namespace
       #   class AdminComponent < ApplicationComponent
       #     include StyleCapsule::ViewComponent
-      #     head_injection!
-      #     stylesheet_namespace :admin
+      #     stylesheet_registry namespace: :admin
       #   end
-      # @example Getting the current namespace
-      #   AdminComponent.stylesheet_namespace  # => :admin or nil
-      def stylesheet_namespace(namespace = nil)
-        if namespace.nil?
-          @stylesheet_namespace if defined?(@stylesheet_namespace)
-        else
-          @stylesheet_namespace = namespace
-        end
-      end
-
-      # Get the custom scope ID if set (alias for capsule_id getter)
-      def custom_capsule_id
-        @custom_capsule_id if defined?(@custom_capsule_id)
-      end
-
-      # Set or get inline CSS cache strategy
-      #
-      # @param strategy [Symbol, nil] Cache strategy: :none (default), :time, :proc, :file (omit to get current value)
-      # @param ttl [Integer, nil] Time-to-live in seconds (for :time strategy)
-      # @param cache_proc [Proc, nil] Custom cache proc (for :proc strategy)
-      #   Proc receives: (css_content, capsule_id, namespace) and should return [cache_key, should_cache, expires_at]
-      # @return [Symbol, nil] The current cache strategy if no argument provided
-      # @example Time-based caching (cache for 1 hour)
+      # @example With time-based caching
       #   class MyComponent < ApplicationComponent
       #     include StyleCapsule::ViewComponent
-      #     head_injection!
-      #     inline_cache_strategy :time, ttl: 3600
+      #     stylesheet_registry cache_strategy: :time, cache_ttl: 1.hour
       #   end
-      # @example Custom proc caching
+      # @example With custom proc caching
       #   class MyComponent < ApplicationComponent
       #     include StyleCapsule::ViewComponent
-      #     head_injection!
-      #     inline_cache_strategy :proc, cache_proc: ->(css, capsule_id, ns) {
+      #     stylesheet_registry cache_strategy: :proc, cache_proc: ->(css, capsule_id, ns) {
       #       cache_key = "css_#{capsule_id}_#{ns}"
-      #       should_cache = css.length > 100  # Only cache large CSS
-      #       expires_at = Time.now + 1800  # 30 minutes
+      #       should_cache = css.length > 100
+      #       expires_at = Time.now + 1800
       #       [cache_key, should_cache, expires_at]
       #     }
       #   end
-      # @example File-based caching (writes to files for HTTP caching)
-      #   # NOTE: File caching requires class method component_styles (def self.component_styles)
+      # @example File-based caching (requires class method component_styles)
       #   class MyComponent < ApplicationComponent
       #     include StyleCapsule::ViewComponent
-      #     head_injection!
-      #     inline_cache_strategy :file
+      #     stylesheet_registry cache_strategy: :file
       #
       #     def self.component_styles  # Must be class method for file caching
       #       <<~CSS
@@ -207,16 +177,80 @@ module StyleCapsule
       #       CSS
       #     end
       #   end
-      # @example Getting the current cache strategy
-      #   MyComponent.inline_cache_strategy  # => :file, :time, :proc, or nil
-      def inline_cache_strategy(strategy = nil, ttl: nil, cache_proc: nil)
-        if strategy.nil?
-          @inline_cache_strategy if defined?(@inline_cache_strategy)
+      # @example All options combined
+      #   class MyComponent < ApplicationComponent
+      #     include StyleCapsule::ViewComponent
+      #     stylesheet_registry namespace: :admin, cache_strategy: :time, cache_ttl: 1.hour
+      #   end
+      def stylesheet_registry(namespace: nil, cache_strategy: :none, cache_ttl: nil, cache_proc: nil)
+        @head_rendering = true
+        @stylesheet_namespace = namespace unless namespace.nil?
+
+        # Normalize cache_strategy: convert strings to symbols, handle Proc
+        normalized_strategy, normalized_proc = normalize_cache_strategy(cache_strategy, cache_proc)
+        @inline_cache_strategy = normalized_strategy
+        @inline_cache_ttl = cache_ttl
+        @inline_cache_proc = normalized_proc
+      end
+
+      private
+
+      # Normalize cache_strategy to handle Symbol, String, and Proc
+      #
+      # @param cache_strategy [Symbol, String, Proc, nil] Cache strategy
+      # @param cache_proc [Proc, nil] Optional cache proc (ignored if cache_strategy is a Proc)
+      # @return [Array<Symbol, Proc|nil>] Normalized strategy and proc
+      def normalize_cache_strategy(cache_strategy, cache_proc)
+        case cache_strategy
+        when Proc
+          # If cache_strategy is a Proc, use it as the proc and set strategy to :proc
+          [:proc, cache_strategy]
+        when String
+          # Convert string to symbol
+          normalized = cache_strategy.to_sym
+          unless [:none, :time, :proc, :file].include?(normalized)
+            raise ArgumentError, "cache_strategy must be :none, :time, :proc, or :file (got: #{cache_strategy.inspect})"
+          end
+          [normalized, cache_proc]
+        when Symbol
+          unless [:none, :time, :proc, :file].include?(cache_strategy)
+            raise ArgumentError, "cache_strategy must be :none, :time, :proc, or :file (got: #{cache_strategy.inspect})"
+          end
+          [cache_strategy, cache_proc]
+        when nil
+          [:none, nil]
         else
-          @inline_cache_strategy = strategy
-          @inline_cache_ttl = ttl
-          @inline_cache_proc = cache_proc
+          raise ArgumentError, "cache_strategy must be a Symbol, String, or Proc (got: #{cache_strategy.class})"
         end
+      end
+
+      # Deprecated: Use stylesheet_registry instead
+      # @deprecated Use {#stylesheet_registry} instead
+      def head_rendering!
+        stylesheet_registry
+      end
+
+      # Check if component uses head rendering
+      def head_rendering?
+        return false unless defined?(@head_rendering)
+        @head_rendering
+      end
+
+      public :head_rendering?
+
+      # Get the namespace for stylesheet registry
+      def stylesheet_namespace
+        @stylesheet_namespace if defined?(@stylesheet_namespace)
+      end
+
+      # Get the custom scope ID if set (alias for capsule_id getter)
+      def custom_capsule_id
+        @custom_capsule_id if defined?(@custom_capsule_id)
+      end
+
+      # Get inline cache strategy
+      def inline_cache_strategy
+        @inline_cache_strategy if defined?(@inline_cache_strategy)
       end
 
       # Get inline cache TTL
@@ -229,6 +263,8 @@ module StyleCapsule
         @inline_cache_proc if defined?(@inline_cache_proc)
       end
 
+      public :head_rendering?, :stylesheet_namespace, :custom_capsule_id, :inline_cache_strategy, :inline_cache_ttl, :inline_cache_proc
+
       # Set or get options for stylesheet_link_tag when using file-based caching
       #
       # @param options [Hash, nil] Options to pass to stylesheet_link_tag (e.g., "data-turbo-track": "reload", omit to get current value)
@@ -236,8 +272,7 @@ module StyleCapsule
       # @example Setting stylesheet link options
       #   class MyComponent < ApplicationComponent
       #     include StyleCapsule::ViewComponent
-      #     head_injection!
-      #     inline_cache_strategy :file
+      #     stylesheet_registry cache_strategy: :file
       #     stylesheet_link_options "data-turbo-track": "reload"
       #   end
       # @example Getting the current options
@@ -249,6 +284,8 @@ module StyleCapsule
           @stylesheet_link_options = options
         end
       end
+
+      public :stylesheet_link_options
 
       # Set or get CSS scoping strategy
       #
@@ -299,6 +336,8 @@ module StyleCapsule
           @css_scoping_strategy = strategy
         end
       end
+
+      public :css_scoping_strategy
     end
 
     # Module that wraps call to add scoped wrapper
@@ -340,7 +379,7 @@ module StyleCapsule
 
     # Render the style capsule <style> tag
     #
-    # Can render in body (default) or register for head injection via StylesheetRegistry
+    # Can render in body (default) or register for head rendering via StylesheetRegistry
     #
     # Supports both instance method (def component_styles) and class method (def self.component_styles).
     # File caching is only allowed for class method component_styles.
@@ -353,9 +392,9 @@ module StyleCapsule
       scoped_css = scope_css(css_content)
       capsule_id = component_capsule
 
-      # Check if component wants head injection
-      if head_injection?
-        # Register for head injection instead of rendering in body
+      # Check if component uses head rendering
+      if head_rendering?
+        # Register for head rendering instead of rendering in body
         namespace = self.class.stylesheet_namespace
 
         # Get cache configuration from class
@@ -392,11 +431,11 @@ module StyleCapsule
       end
     end
 
-    # Check if component should use head injection
+    # Check if component should use head rendering
     #
     # Checks class-level configuration first, then allows instance override.
-    def head_injection?
-      return true if self.class.head_injection?
+    def head_rendering?
+      return true if self.class.head_rendering?
       false
     end
 

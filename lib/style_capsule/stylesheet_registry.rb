@@ -13,10 +13,10 @@ module StyleCapsule
   #
   # Supports namespaces for separation of stylesheets (e.g., "admin", "user", "public").
   #
-  # @example Usage in a component with head injection
+  # @example Usage in a component with head rendering
   #   class MyComponent < ApplicationComponent
   #     include StyleCapsule::Component
-  #     head_injection!  # Enable head injection
+  #     stylesheet_registry  # Enable head rendering
   #
   #     def component_styles
   #       <<~CSS
@@ -83,7 +83,7 @@ module StyleCapsule
       namespace.to_sym
     end
 
-    # Register a stylesheet file path for head injection
+    # Register a stylesheet file path for head rendering
     #
     # Static file paths are stored in process-wide manifest (collected once per process).
     # This is similar to Propshaft's manifest approach - files are static, so we can
@@ -110,7 +110,7 @@ module StyleCapsule
       @manifest[ns] << entry
     end
 
-    # Register inline CSS for head injection
+    # Register inline CSS for head rendering
     #
     # Inline CSS can be cached based on cache configuration. Supports:
     # - No caching (default): stored per-request
@@ -123,7 +123,7 @@ module StyleCapsule
     # @param capsule_id [String, nil] Optional capsule ID for reference
     # @param cache_key [String, nil] Optional cache key (for cache lookup)
     # @param cache_strategy [Symbol, nil] Cache strategy: :none, :time, :proc, :file (default: :none)
-    # @param cache_ttl [Integer, nil] Time-to-live in seconds (for :time strategy)
+    # @param cache_ttl [Integer, ActiveSupport::Duration, nil] Time-to-live in seconds (for :time strategy). Supports ActiveSupport::Duration (e.g., 1.hour, 30.minutes)
     # @param cache_proc [Proc, nil] Custom cache proc (for :proc strategy)
     #   Proc receives: (css_content, capsule_id, namespace) and should return [cache_key, should_cache, expires_at]
     # @param component_class [Class, nil] Component class (for :file strategy)
@@ -199,7 +199,7 @@ module StyleCapsule
     #
     # @param cache_key [String] Cache key to look up
     # @param cache_strategy [Symbol] Cache strategy
-    # @param cache_ttl [Integer, nil] Time-to-live in seconds
+    # @param cache_ttl [Integer, ActiveSupport::Duration, nil] Time-to-live in seconds. Supports ActiveSupport::Duration (e.g., 1.hour, 30.minutes)
     # @param cache_proc [Proc, nil] Custom cache proc
     # @param css_content [String] Original CSS content (for proc strategy)
     # @param capsule_id [String, nil] Capsule ID (for proc strategy)
@@ -232,7 +232,7 @@ module StyleCapsule
     # @param cache_key [String] Cache key
     # @param css_content [String] CSS content to cache
     # @param cache_strategy [Symbol] Cache strategy
-    # @param cache_ttl [Integer, nil] Time-to-live in seconds
+    # @param cache_ttl [Integer, ActiveSupport::Duration, nil] Time-to-live in seconds. Supports ActiveSupport::Duration (e.g., 1.hour, 30.minutes)
     # @param cache_proc [Proc, nil] Custom cache proc
     # @param capsule_id [String, nil] Capsule ID
     # @param namespace [Symbol] Namespace
