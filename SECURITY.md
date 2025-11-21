@@ -35,7 +35,7 @@ StyleCapsule provides minimal security protections to assist with automated CSS 
 2. **Use Content Security Policy**: Configure CSP headers to restrict inline styles and external resources
 3. **Sanitize User-Generated CSS**: If allowing user input, sanitize CSS before processing
 4. **Keep Dependencies Updated**: Use supported Ruby (>= 3.0) and Rails versions with security patches
-5. **Review Generated Files**: Periodically review files in `app/assets/build/capsules/` if using file-based caching
+5. **Review Generated Files**: Periodically review files in `app/assets/builds/capsules/` if using file-based caching
 
 ### Reporting a Vulnerability
 

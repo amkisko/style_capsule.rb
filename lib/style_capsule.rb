@@ -75,7 +75,7 @@ require "active_support/core_ext/string"
 #     stylesheet_registry cache_strategy: :file  # Writes CSS to files for HTTP caching
 #   end
 #
-#   # CSS files are written to app/assets/build/capsules/
+#   # CSS files are written to app/assets/builds/capsules/
 #   # Files are automatically precompiled via: bin/rails assets:precompile
 #   # Or manually: bin/rails style_capsule:build
 module StyleCapsule

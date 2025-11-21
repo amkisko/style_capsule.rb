@@ -262,7 +262,7 @@ end
 ```ruby
 # config/initializers/style_capsule.rb
 StyleCapsule::CssFileWriter.configure(
-  output_dir: Rails.root.join("app/assets/build/capsules"),
+  output_dir: Rails.root.join("app/assets/builds/capsules"),
   filename_pattern: ->(component_class, capsule_id) {
     "capsule-#{capsule_id}.css"
   }

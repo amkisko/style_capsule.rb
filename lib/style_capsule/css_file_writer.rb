@@ -25,7 +25,7 @@ module StyleCapsule
   #   # => "capsules/capsule-abc123"
   class CssFileWriter
     # Default output directory for CSS files (relative to Rails root)
-    DEFAULT_OUTPUT_DIR = "app/assets/build/capsules"
+    DEFAULT_OUTPUT_DIR = "app/assets/builds/capsules"
 
     class << self
       attr_accessor :output_dir, :filename_pattern, :enabled
