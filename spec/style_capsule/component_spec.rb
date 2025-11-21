@@ -270,6 +270,65 @@ RSpec.describe StyleCapsule::Component do
       }.to raise_error(ArgumentError, /cache_strategy must be/)
     end
 
+    it "rejects invalid cache_strategy string" do
+      expect {
+        component_class.stylesheet_registry cache_strategy: "invalid"
+      }.to raise_error(ArgumentError, /cache_strategy must be/)
+    end
+
+    it "handles nil cache_strategy" do
+      component_class.stylesheet_registry cache_strategy: nil
+      expect(component_class.inline_cache_strategy).to eq(:none)
+    end
+
+    it "rejects invalid cache_strategy type" do
+      expect {
+        component_class.stylesheet_registry cache_strategy: 123
+      }.to raise_error(ArgumentError, /cache_strategy must be a Symbol, String, or Proc/)
+    end
+
+    it "supports deprecated head_rendering! method" do
+      component_class.send(:head_rendering!)
+      expect(component_class.head_rendering?).to be true
+    end
+
+    describe ".stylesheet_link_options" do
+      it "sets stylesheet link options" do
+        options = {"data-turbo-track": "reload"}
+        component_class.stylesheet_link_options(options)
+        expect(component_class.stylesheet_link_options).to eq(options)
+      end
+
+      it "returns nil when options are not set" do
+        fresh_class = Class.new do
+          include StyleCapsule::Component
+        end
+        expect(fresh_class.stylesheet_link_options).to be_nil
+      end
+    end
+
+    describe ".css_scoping_strategy" do
+      it "inherits strategy from parent class" do
+        parent_class = Class.new do
+          include StyleCapsule::Component
+        end
+        parent_class.css_scoping_strategy(:nesting)
+
+        child_class = Class.new(parent_class) do
+          include StyleCapsule::Component
+        end
+
+        expect(child_class.css_scoping_strategy).to eq(:nesting)
+      end
+
+      it "defaults to selector_patching when no strategy set" do
+        fresh_class = Class.new do
+          include StyleCapsule::Component
+        end
+        expect(fresh_class.css_scoping_strategy).to eq(:selector_patching)
+      end
+    end
+
     it "registers inline CSS for head rendering when enabled" do
       component_class.stylesheet_registry
       StyleCapsule::StylesheetRegistry.clear
@@ -305,6 +364,14 @@ RSpec.describe StyleCapsule::Component do
         component_class.capsule_id("custom-123")
         expect(component_class.custom_capsule_id).to eq("custom-123")
         expect(component.component_capsule).to eq("custom-123")
+      end
+
+      it "returns nil when capsule_id is not set" do
+        # Create a fresh class without setting capsule_id
+        fresh_class = Class.new do
+          include StyleCapsule::Component
+        end
+        expect(fresh_class.capsule_id).to be_nil
       end
     end
 

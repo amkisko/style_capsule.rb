@@ -89,5 +89,32 @@ RSpec.describe StyleCapsule::PhlexHelper do
         .and_return('<link rel="stylesheet">')
       helper.stylesheet_registrymap_tags(namespace: :admin)
     end
+
+    it "uses safe() method when available (Phlex component)" do
+      helper_class_with_safe = Class.new do
+        include StyleCapsule::PhlexHelper
+
+        attr_accessor :view_context_double
+
+        def view_context
+          @view_context_double
+        end
+
+        def safe(content)
+          "safe_#{content}"
+        end
+
+        def raw(content)
+          "raw_#{content}"
+        end
+      end
+
+      helper_with_safe = helper_class_with_safe.new
+      helper_with_safe.view_context_double = view_context_double
+      helper_with_safe.register_stylesheet("stylesheets/test")
+
+      result = helper_with_safe.stylesheet_registrymap_tags
+      expect(result).to be_a(String)
+    end
   end
 end

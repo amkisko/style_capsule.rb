@@ -9,7 +9,7 @@ Gem::Specification.new do |spec|
   spec.email = ["contact@kiskolabs.com"]
 
   spec.summary = "Attribute-based CSS scoping for Phlex, ViewComponent, and ERB templates."
-  spec.description = "Provides component-scoped CSS encapsulation using [data-capsule] attributes for Phlex components, ViewComponent components, and ERB templates. Styles are automatically scoped to prevent leakage between components. Inspired by component-based CSS approaches like Angular's view encapsulation and CSS modules."
+  spec.description = "Provides component-scoped CSS encapsulation using [data-capsule] attributes for Phlex components, ViewComponent components, and ERB templates. Styles are automatically scoped to prevent leakage between components. Inspired by component-based CSS approaches like Angular's view encapsulation and CSS modules. Works with Rails and can be used standalone in other Ruby frameworks (Sinatra, Hanami, etc.) or plain Ruby scripts."
   spec.homepage = "https://github.com/amkisko/style_capsule.rb"
   spec.license = "MIT"
 
@@ -28,9 +28,8 @@ Gem::Specification.new do |spec|
     "rubygems_mfa_required" => "true"
   }
 
-  spec.add_runtime_dependency "activesupport", ">= 6.0", "< 9.0"
-  spec.add_runtime_dependency "railties", ">= 6.0", "< 9.0"
-
+  spec.add_development_dependency "activesupport", ">= 6.0", "< 9.0"  # Optional, recommended for Rails
+  spec.add_development_dependency "railties", ">= 6.0", "< 9.0"  # For testing Rails integration
   spec.add_development_dependency "rspec", "~> 3"
   spec.add_development_dependency "webmock", "~> 3"
   spec.add_development_dependency "rake", "~> 13"

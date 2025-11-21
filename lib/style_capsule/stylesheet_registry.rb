@@ -1,8 +1,16 @@
 # frozen_string_literal: true
 
-require "active_support/current_attributes"
-
 module StyleCapsule
+  # Helper to determine the parent class for StylesheetRegistry
+  # ActiveSupport::CurrentAttributes is optional - if ActiveSupport is loaded,
+  # it will be available. Otherwise, we fall back to Object.
+  #
+  # This is evaluated at class definition time, so it can't be stubbed.
+  # For testing fallback paths, use the instance methods that check availability.
+  def self.stylesheet_registry_parent_class
+    defined?(ActiveSupport::CurrentAttributes) ? ActiveSupport::CurrentAttributes : Object
+  end
+
   # Hybrid registry for stylesheet files that need to be injected into <head>
   #
   # Uses a process-wide manifest for static file paths (like Propshaft) and request-scoped
@@ -52,7 +60,7 @@ module StyleCapsule
   #       body(&block)
   #     end
   #   end
-  class StylesheetRegistry < ActiveSupport::CurrentAttributes
+  class StylesheetRegistry < StyleCapsule.stylesheet_registry_parent_class
     # Default namespace for backward compatibility
     DEFAULT_NAMESPACE = :default
 
@@ -68,10 +76,74 @@ module StyleCapsule
     @last_cleanup_time = nil # rubocop:disable Style/ClassVars
 
     # Request-scoped storage for inline CSS only
-    attribute :inline_stylesheets
+    # Only define attribute if we're inheriting from CurrentAttributes
+    if defined?(ActiveSupport::CurrentAttributes) && self < ActiveSupport::CurrentAttributes
+      attribute :inline_stylesheets
+    end
 
     class << self
       attr_reader :manifest, :inline_cache
+
+      # Get current time (ActiveSupport::Time.current or Time.now fallback)
+      def current_time
+        if defined?(Time) && Time.respond_to?(:current)
+          Time.current
+        else
+          # rubocop:disable Rails/TimeZone
+          # Time.now is intentional fallback for non-Rails usage when Time.current is unavailable
+          Time.now
+          # rubocop:enable Rails/TimeZone
+        end
+      end
+
+      # Check if we're using ActiveSupport::CurrentAttributes
+      # This method can be stubbed in tests to test fallback paths
+      def using_current_attributes?
+        defined?(ActiveSupport::CurrentAttributes) && self < ActiveSupport::CurrentAttributes
+      end
+
+      # Get inline stylesheets (thread-local fallback if not using CurrentAttributes)
+      def inline_stylesheets
+        if using_current_attributes?
+          # When using CurrentAttributes, access the instance attribute
+          # CurrentAttributes automatically provides access to instance attributes
+          inst = instance
+          inst&.inline_stylesheets || {}
+        else
+          Thread.current[:style_capsule_inline_stylesheets] ||= {}
+        end
+      end
+
+      # Set inline stylesheets (thread-local fallback if not using CurrentAttributes)
+      def inline_stylesheets=(value)
+        if using_current_attributes?
+          # When using CurrentAttributes, set via the instance
+          inst = instance
+          inst.inline_stylesheets = value if inst
+        else
+          Thread.current[:style_capsule_inline_stylesheets] = value
+        end
+      end
+
+      # Get instance (for CurrentAttributes compatibility)
+      def instance
+        if using_current_attributes?
+          # Call the CurrentAttributes instance method from parent class
+          super
+        else
+          # Return a simple object that responds to inline_stylesheets
+          # This is mainly for compatibility with code that might call instance.inline_stylesheets
+          registry_class = self
+          @_standalone_instance ||= begin
+            obj = Object.new
+            obj.define_singleton_method(:inline_stylesheets) { registry_class.inline_stylesheets }
+            obj.define_singleton_method(:inline_stylesheets=) { |v| registry_class.inline_stylesheets = v }
+            obj
+          end
+        end
+      end
+
+      private
     end
 
     # Normalize namespace (nil/blank becomes DEFAULT_NAMESPACE)
@@ -177,14 +249,14 @@ module StyleCapsule
       final_css = cached_css || css_content
 
       # Store in request-scoped registry
-      registry = instance.inline_stylesheets || {}
+      registry = inline_stylesheets
       registry[ns] ||= []
       registry[ns] << {
         type: :inline,
         css_content: final_css,
         capsule_id: capsule_id
       }
-      instance.inline_stylesheets = registry
+      self.inline_stylesheets = registry
 
       # Cache the CSS if strategy is enabled and not already cached
       if cache_strategy != :none && cache_key && !cached_css && cache_strategy != :file
@@ -216,7 +288,7 @@ module StyleCapsule
       # Check expiration based on strategy
       case cache_strategy
       when :time
-        return nil if cache_ttl && cached_entry[:expires_at] && Time.current > cached_entry[:expires_at]
+        return nil if cache_ttl && cached_entry[:expires_at] && current_time > cached_entry[:expires_at]
       when :proc
         return nil unless cache_proc
         # Proc should validate cache entry
@@ -242,7 +314,13 @@ module StyleCapsule
 
       case cache_strategy
       when :time
-        expires_at = cache_ttl ? Time.current + cache_ttl : nil
+        # Handle ActiveSupport::Duration (e.g., 1.hour) or integer seconds
+        ttl_seconds = if cache_ttl.respond_to?(:to_i)
+          cache_ttl.to_i
+        else
+          cache_ttl
+        end
+        expires_at = ttl_seconds ? current_time + ttl_seconds : nil
       when :proc
         if cache_proc
           _key, _should_cache, proc_expires = cache_proc.call(css_content, capsule_id, namespace)
@@ -252,7 +330,7 @@ module StyleCapsule
 
       @inline_cache[cache_key] = {
         css_content: css_content,
-        cached_at: Time.current,
+        cached_at: current_time,
         expires_at: expires_at
       }
     end
@@ -287,18 +365,18 @@ module StyleCapsule
     def self.cleanup_expired_cache
       return 0 if @inline_cache.empty?
 
-      current_time = Time.current
+      now = current_time
       expired_keys = []
 
       @inline_cache.each do |cache_key, entry|
         # Remove entries that have an expires_at time and it's in the past
-        if entry[:expires_at] && current_time > entry[:expires_at]
+        if entry[:expires_at] && now > entry[:expires_at]
           expired_keys << cache_key
         end
       end
 
       expired_keys.each { |key| @inline_cache.delete(key) }
-      @last_cleanup_time = current_time
+      @last_cleanup_time = now
 
       expired_keys.size
     end
@@ -314,7 +392,7 @@ module StyleCapsule
       # Cleanup every 5 minutes (300 seconds) to balance memory usage and performance
       cleanup_interval = 300
 
-      if @last_cleanup_time.nil? || (Time.current - @last_cleanup_time) > cleanup_interval
+      if @last_cleanup_time.nil? || (current_time - @last_cleanup_time) > cleanup_interval
         cleanup_expired_cache
       end
     end
@@ -332,7 +410,7 @@ module StyleCapsule
     #
     # @return [Hash<Symbol, Array<Hash>>] Hash of namespace => array of inline stylesheet registrations
     def self.request_inline_stylesheets
-      instance.inline_stylesheets || {}
+      inline_stylesheets
     end
 
     # Get all stylesheets (files + inline) for a specific namespace
@@ -361,12 +439,12 @@ module StyleCapsule
     # @return [void]
     def self.clear(namespace: nil)
       if namespace.nil?
-        instance.inline_stylesheets = {}
+        self.inline_stylesheets = {}
       else
         ns = normalize_namespace(namespace)
-        registry = instance.inline_stylesheets || {}
+        registry = inline_stylesheets
         registry.delete(ns)
-        instance.inline_stylesheets = registry
+        self.inline_stylesheets = registry
       end
     end
 
@@ -411,7 +489,7 @@ module StyleCapsule
         end
 
         clear # Clear request-scoped inline CSS only
-        return "".html_safe if all_stylesheets.empty?
+        return safe_string("") if all_stylesheets.empty?
 
         all_stylesheets.map do |stylesheet|
           if stylesheet[:type] == :inline
@@ -419,7 +497,7 @@ module StyleCapsule
           else
             render_file_stylesheet(stylesheet, view_context)
           end
-        end.join("\n").html_safe
+        end.join("\n").then { |s| safe_string(s) }
 
       else
         # Render specific namespace
@@ -427,7 +505,7 @@ module StyleCapsule
         stylesheets = stylesheets_for(namespace: ns).dup
         clear(namespace: ns) # Clear request-scoped inline CSS only
 
-        return "".html_safe if stylesheets.empty?
+        return safe_string("") if stylesheets.empty?
 
         stylesheets.map do |stylesheet|
           if stylesheet[:type] == :inline
@@ -435,7 +513,7 @@ module StyleCapsule
           else
             render_file_stylesheet(stylesheet, view_context)
           end
-        end.join("\n").html_safe
+        end.join("\n").then { |s| safe_string(s) }
 
       end
     end
@@ -473,7 +551,7 @@ module StyleCapsule
         # Fallback if no view context
         href = "/assets/#{file_path}.css"
         tag_options = options.map { |k, v| %(#{k}="#{v}") }.join(" ")
-        %(<link rel="stylesheet" href="#{href}"#{" #{tag_options}" unless tag_options.empty?}>).html_safe
+        safe_string(%(<link rel="stylesheet" href="#{href}"#{" #{tag_options}" unless tag_options.empty?}>))
       end
     end
 
@@ -486,9 +564,21 @@ module StyleCapsule
       # Construct HTML manually to avoid any HTML escaping issues
       # CSS content should not be HTML-escaped as it's inside a <style> tag
       # Using string interpolation with html_safe ensures CSS is not escaped
-      %(<style type="text/css">#{css_content}</style>).html_safe
+      safe_string(%(<style type="text/css">#{css_content}</style>))
     end
 
-    private_class_method :render_file_stylesheet, :render_inline_stylesheet
+    # Make string HTML-safe (compatible with Rails and non-Rails)
+    #
+    # @param string [String] String to mark as safe
+    # @return [String] HTML-safe string
+    def self.safe_string(string)
+      if string.respond_to?(:html_safe)
+        string.html_safe
+      else
+        string
+      end
+    end
+
+    private_class_method :render_file_stylesheet, :render_inline_stylesheet, :safe_string
   end
 end

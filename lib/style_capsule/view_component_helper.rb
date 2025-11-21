@@ -36,18 +36,22 @@ module StyleCapsule
       StyleCapsule::StylesheetRegistry.register(file_path, namespace: namespace, **options)
     end
 
-    # Render StyleCapsule registered stylesheets (similar to javascript_importmap_tags)
+    # Render StyleCapsule registered stylesheets
     #
     # Usage in ViewComponent layouts:
     #   def call
-    #     helpers.stylesheet_registrymap_tags
-    #     helpers.stylesheet_registrymap_tags(namespace: :admin)
+    #     helpers.stylesheet_registry_tags
+    #     helpers.stylesheet_registry_tags(namespace: :admin)
     #   end
     #
     # @param namespace [Symbol, String, nil] Optional namespace to render (nil/blank renders all)
     # @return [String] HTML-safe string with stylesheet tags
-    def stylesheet_registrymap_tags(namespace: nil)
+    def stylesheet_registry_tags(namespace: nil)
       StyleCapsule::StylesheetRegistry.render_head_stylesheets(helpers, namespace: namespace)
     end
+
+    # @deprecated Use {#stylesheet_registry_tags} instead.
+    #   This method name will be removed in a future version.
+    alias_method :stylesheet_registrymap_tags, :stylesheet_registry_tags
   end
 end

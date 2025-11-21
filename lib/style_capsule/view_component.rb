@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "digest/sha1"
-require "active_support/core_ext/string"
+# ActiveSupport string extensions are conditionally required in lib/style_capsule.rb
 
 module StyleCapsule
   # ViewComponent component concern for encapsulated CSS
