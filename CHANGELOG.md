@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Next Release (TBD)
+## 1.1.0 (2025-11-21)
 
 - Made Rails dependencies optional: `railties` and `activesupport` moved to development dependencies
 - Core functionality now works without Rails (Sinatra, Hanami, plain Ruby, etc.)
@@ -9,6 +9,8 @@
 - `StylesheetRegistry` now works without `ActiveSupport::CurrentAttributes` using thread-local storage fallback
 - Renamed `stylesheet_registrymap_tags` to `stylesheet_registry_tags` (old name kept as deprecated alias)
 - Extracted CSS building logic from Rake tasks into `StyleCapsule::ComponentBuilder`
+- Fixed XSS vulnerability in `escape_html_attr` by using `CGI.escapeHTML` for proper HTML entity escaping
+- Optimized ActiveSupport require to avoid exception handling overhead in Rails apps
 
 ## 1.0.2 (2025-11-21)
 
