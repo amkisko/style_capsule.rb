@@ -1,7 +1,16 @@
 # frozen_string_literal: true
 
 require "digest/sha1"
-require "active_support/core_ext/string"
+# Conditionally require ActiveSupport string extensions if available
+# For non-Rails usage, these are optional
+# Check first to avoid exception handling overhead in common case (Rails apps)
+unless defined?(ActiveSupport) || String.method_defined?(:html_safe)
+  begin
+    require "active_support/core_ext/string"
+  rescue LoadError
+    # ActiveSupport not available - core functionality still works
+  end
+end
 
 module StyleCapsule
   # ERB Helper module for use in Rails views
@@ -148,16 +157,20 @@ module StyleCapsule
       StyleCapsule::StylesheetRegistry.register(file_path, namespace: namespace, **options)
     end
 
-    # Render StyleCapsule registered stylesheets (similar to javascript_importmap_tags)
+    # Render StyleCapsule registered stylesheets
     #
     # Usage in ERB:
-    #   <%= stylesheet_registrymap_tags %>
-    #   <%= stylesheet_registrymap_tags(namespace: :admin) %>
+    #   <%= stylesheet_registry_tags %>
+    #   <%= stylesheet_registry_tags(namespace: :admin) %>
     #
     # @param namespace [Symbol, String, nil] Optional namespace to render (nil/blank renders all)
     # @return [String] HTML-safe string with stylesheet tags
-    def stylesheet_registrymap_tags(namespace: nil)
+    def stylesheet_registry_tags(namespace: nil)
       StyleCapsule::StylesheetRegistry.render_head_stylesheets(self, namespace: namespace)
     end
+
+    # @deprecated Use {#stylesheet_registry_tags} instead.
+    #   This method name will be removed in a future version.
+    alias_method :stylesheet_registrymap_tags, :stylesheet_registry_tags
   end
 end

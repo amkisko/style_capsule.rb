@@ -1,7 +1,16 @@
 # frozen_string_literal: true
 
 require "digest/sha1"
-require "active_support/core_ext/string"
+# Conditionally require ActiveSupport string extensions if available
+# For non-Rails usage, these are optional
+# Check first to avoid exception handling overhead in common case (Rails apps)
+unless defined?(ActiveSupport) || String.method_defined?(:html_safe)
+  begin
+    require "active_support/core_ext/string"
+  rescue LoadError
+    # ActiveSupport not available - core functionality still works
+  end
+end
 
 # StyleCapsule provides attribute-based CSS scoping for component encapsulation
 # in Phlex components, ViewComponent components, and ERB templates.
@@ -55,8 +64,8 @@ require "active_support/core_ext/string"
 #     <div class="section">Content</div>
 #   <% end %>
 #
-#   <%= stylesheet_registrymap_tags %>
-#   <%= stylesheet_registrymap_tags(namespace: :admin) %>
+#   <%= stylesheet_registry_tags %>
+#   <%= stylesheet_registry_tags(namespace: :admin) %>
 #
 # @example Namespace Support
 #   # Register stylesheets with namespaces
@@ -64,10 +73,10 @@ require "active_support/core_ext/string"
 #   StyleCapsule::StylesheetRegistry.register('stylesheets/user/profile', namespace: :user)
 #
 #   # Render all namespaces (default)
-#   <%= stylesheet_registrymap_tags %>
+#   <%= stylesheet_registry_tags %>
 #
 #   # Render specific namespace
-#   <%= stylesheet_registrymap_tags(namespace: :admin) %>
+#   <%= stylesheet_registry_tags(namespace: :admin) %>
 #
 # @example File-Based Caching (HTTP Caching)
 #   class MyComponent < ApplicationComponent
@@ -85,9 +94,11 @@ module StyleCapsule
   require_relative "style_capsule/stylesheet_registry"
   require_relative "style_capsule/component_styles_support"
   require_relative "style_capsule/component"
+  require_relative "style_capsule/standalone_helper"
   require_relative "style_capsule/helper"
   require_relative "style_capsule/phlex_helper"
   require_relative "style_capsule/view_component"
   require_relative "style_capsule/view_component_helper"
+  require_relative "style_capsule/component_builder"
   require_relative "style_capsule/railtie" if defined?(Rails) && defined?(Rails::Railtie)
 end

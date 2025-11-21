@@ -153,6 +153,14 @@ RSpec.describe StyleCapsule::Helper do
         expect(result).to include("No CSS here")
         expect(result).not_to include("<style")
       end
+
+      it "raises error when HTML content exceeds maximum size" do
+        large_content = "x" * (StyleCapsule::Helper::MAX_HTML_SIZE + 1)
+
+        expect {
+          helper.style_capsule { large_content }
+        }.to raise_error(ArgumentError, /exceeds maximum size/)
+      end
     end
   end
 

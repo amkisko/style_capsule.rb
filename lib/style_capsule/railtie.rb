@@ -36,7 +36,9 @@ module StyleCapsule
           ObjectSpace.each_object(Class) do |klass|
             # Skip singleton classes and classes without names (they can cause errors)
             # Singleton classes don't have proper names and can't be safely checked
-            next if klass.name.blank?
+            # Use fallback for blank? if ActiveSupport not available
+            name = klass.name
+            next if name.nil? || (name.respond_to?(:blank?) ? name.blank? : name.to_s.strip.empty?)
             next if klass.singleton_class?
 
             # Use method_defined? instead of respond_to? to avoid triggering delegation

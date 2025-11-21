@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## Next Release (TBD)
+
+- Made Rails dependencies optional: `railties` and `activesupport` moved to development dependencies
+- Core functionality now works without Rails (Sinatra, Hanami, plain Ruby, etc.)
+- Rails integration remains fully supported via Railtie
+- Added `StyleCapsule::StandaloneHelper` for non-Rails frameworks
+- `StylesheetRegistry` now works without `ActiveSupport::CurrentAttributes` using thread-local storage fallback
+- Renamed `stylesheet_registrymap_tags` to `stylesheet_registry_tags` (old name kept as deprecated alias)
+- Extracted CSS building logic from Rake tasks into `StyleCapsule::ComponentBuilder`
+
 ## 1.0.2 (2025-11-21)
 
 - Fix default output directory for CSS files to app/assets/builds/capsules/
@@ -26,4 +36,3 @@
 - Security features: path traversal protection, CSS size limits (1MB), scope ID validation, filename validation
 - Ruby >= 3.0 requirement
 - Comprehensive test suite with > 93% coverage
-

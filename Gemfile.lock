@@ -2,8 +2,6 @@ PATH
   remote: .
   specs:
     style_capsule (1.0.2)
-      activesupport (>= 6.0, < 9.0)
-      railties (>= 6.0, < 9.0)
 
 GEM
   remote: https://rubygems.org/
@@ -244,9 +242,11 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
+  activesupport (>= 6.0, < 9.0)
   appraisal (~> 2)
   memory_profiler (~> 1)
   phlex-rails (~> 2.0)
+  railties (>= 6.0, < 9.0)
   rake (~> 13)
   rbs (~> 3)
   rspec (~> 3)

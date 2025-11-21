@@ -160,8 +160,13 @@ RSpec.configure do |config|
     StyleCapsule::StylesheetRegistry.clear_inline_cache
   end
 
-  # Reset CurrentAttributes after each test
+  # Reset CurrentAttributes after each test (if available)
   config.after(:each) do
-    StyleCapsule::StylesheetRegistry.reset
+    # Only call reset if we're actually using CurrentAttributes
+    # Check both respond_to? and that it's actually a CurrentAttributes method
+    if StyleCapsule::StylesheetRegistry.respond_to?(:reset) &&
+        StyleCapsule::StylesheetRegistry.using_current_attributes?
+      StyleCapsule::StylesheetRegistry.reset
+    end
   end
 end

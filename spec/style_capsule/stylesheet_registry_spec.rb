@@ -240,6 +240,104 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
       expect(result).to include("stylesheet")
       expect(result).to include("style")
     end
+
+    it "renders specific namespace with mixed file and inline stylesheets" do
+      described_class.register("stylesheets/admin", namespace: :admin)
+      described_class.register_inline(".admin { color: red; }", namespace: :admin)
+      allow(view_context).to receive(:stylesheet_link_tag).and_return('<link rel="stylesheet">')
+      allow(view_context).to receive(:content_tag).and_return("<style></style>")
+      result = described_class.render_head_stylesheets(view_context, namespace: :admin)
+      expect(result).to include("stylesheet")
+      expect(result).to include("style")
+    end
+  end
+
+  describe ".clear_inline_cache" do
+    it "clears specific cache key" do
+      cache_key = "test_key"
+      described_class.cache_inline_css(
+        cache_key,
+        ".test { color: red; }",
+        cache_strategy: :time,
+        cache_ttl: 3600
+      )
+      expect(described_class.instance_variable_get(:@inline_cache)[cache_key]).not_to be_nil
+
+      described_class.clear_inline_cache(cache_key)
+      expect(described_class.instance_variable_get(:@inline_cache)[cache_key]).to be_nil
+    end
+
+    it "clears all cache when no key provided" do
+      described_class.cache_inline_css("key1", ".test1 { }", cache_strategy: :time, cache_ttl: 3600)
+      described_class.cache_inline_css("key2", ".test2 { }", cache_strategy: :time, cache_ttl: 3600)
+      expect(described_class.instance_variable_get(:@inline_cache).size).to eq(2)
+
+      described_class.clear_inline_cache
+      expect(described_class.instance_variable_get(:@inline_cache)).to be_empty
+    end
+  end
+
+  describe ".cached_inline" do
+    it "returns nil when proc cache strategy says not to use" do
+      cache_key = "test_key"
+      cache_proc = ->(_css, _capsule, _ns) { ["key", false, nil] }  # should_use = false
+      css = ".test { color: red; }"
+
+      # Cache it first
+      described_class.cache_inline_css(
+        cache_key,
+        css,
+        cache_strategy: :proc,
+        cache_proc: cache_proc,
+        capsule_id: "abc",
+        namespace: :default
+      )
+
+      # Try to retrieve - should return nil because proc says not to use
+      result = described_class.cached_inline(
+        cache_key,
+        cache_strategy: :proc,
+        cache_proc: cache_proc,
+        css_content: css,
+        capsule_id: "abc",
+        namespace: :default
+      )
+
+      expect(result).to be_nil
+    end
+
+    it "handles cache_ttl that doesn't respond to to_i" do
+      cache_key = "test_key"
+      # Use a cache_ttl that doesn't respond to to_i (like nil)
+      described_class.cache_inline_css(
+        cache_key,
+        ".test { color: red; }",
+        cache_strategy: :time,
+        cache_ttl: nil
+      )
+
+      result = described_class.cached_inline(
+        cache_key,
+        cache_strategy: :time,
+        cache_ttl: nil
+      )
+
+      expect(result).to eq(".test { color: red; }")
+    end
+  end
+
+  describe ".safe_string" do
+    it "returns string as-is when it doesn't respond to html_safe" do
+      string = "Hello"
+      result = described_class.send(:safe_string, string)
+      expect(result).to eq("Hello")
+    end
+
+    it "calls html_safe on string when available" do
+      string = ActiveSupport::SafeBuffer.new("Hello")
+      result = described_class.send(:safe_string, string)
+      expect(result).to be_a(ActiveSupport::SafeBuffer)
+    end
   end
 
   describe ".render_file_stylesheet" do
@@ -310,6 +408,111 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
       result = described_class.send(:render_inline_stylesheet, stylesheet, view_context)
       expect(result).to include('<style type="text/css">')
       expect(result).to include(css)
+    end
+  end
+
+  describe ".register_inline with file strategy and existing file" do
+    let(:component_class) do
+      Class.new do
+        def self.name
+          "TestComponent"
+        end
+      end
+    end
+    let(:capsule_id) { "abc123" }
+    let(:test_output_dir) { Pathname.new(Dir.mktmpdir) }
+
+    before do
+      require "style_capsule/css_file_writer"
+      StyleCapsule::CssFileWriter.configure(
+        output_dir: test_output_dir,
+        enabled: true
+      )
+    end
+
+    after do
+      StyleCapsule::CssFileWriter.clear_files
+      FileUtils.rm_rf(test_output_dir) if Dir.exist?(test_output_dir)
+    end
+
+    it "uses stylesheet_link_options when file exists" do
+      # Create a file first
+      css_content = ".test { color: red; }"
+      StyleCapsule::CssFileWriter.write_css(
+        css_content: css_content,
+        component_class: component_class,
+        capsule_id: capsule_id
+      )
+
+      # Register inline with file strategy and stylesheet_link_options
+      # This should detect the existing file and register it with the options
+      link_options = {"data-turbo-track": "reload"}
+      described_class.register_inline(
+        css_content,
+        cache_strategy: :file,
+        component_class: component_class,
+        capsule_id: capsule_id,
+        stylesheet_link_options: link_options
+      )
+
+      # Check that the file was registered with the options
+      stylesheets = described_class.stylesheets_for
+      expect(stylesheets.length).to eq(1)
+      expect(stylesheets.first[:file_path]).to be_a(String)
+      expect(stylesheets.first[:options][:"data-turbo-track"]).to eq("reload")
+    end
+  end
+
+  describe ".cleanup_expired_cache" do
+    before do
+      # Clear cache before each test to avoid interference
+      described_class.clear_inline_cache
+    end
+
+    it "removes expired cache entries" do
+      # Create cache entries with different expiration times
+      # rubocop:disable Rails/TimeZone
+      # Time.now is intentional for testing cache expiration
+      past_time = Time.now - 3600
+      future_time = Time.now + 3600
+      # rubocop:enable Rails/TimeZone
+
+      # Create expired entry
+      cache_key1 = "expired_key"
+      described_class.instance_variable_get(:@inline_cache)[cache_key1] = {
+        css_content: ".expired { }",
+        cached_at: past_time,
+        expires_at: past_time - 100
+      }
+
+      # Create non-expired entry
+      cache_key2 = "valid_key"
+      described_class.instance_variable_get(:@inline_cache)[cache_key2] = {
+        css_content: ".valid { }",
+        cached_at: past_time,
+        expires_at: future_time
+      }
+
+      # Create entry without expires_at (should not be removed)
+      cache_key3 = "no_expiry_key"
+      described_class.instance_variable_get(:@inline_cache)[cache_key3] = {
+        css_content: ".no_expiry { }",
+        cached_at: past_time,
+        expires_at: nil
+      }
+
+      # Cleanup should remove only expired entries
+      removed_count = described_class.cleanup_expired_cache
+
+      expect(removed_count).to eq(1)
+      expect(described_class.instance_variable_get(:@inline_cache)[cache_key1]).to be_nil
+      expect(described_class.instance_variable_get(:@inline_cache)[cache_key2]).not_to be_nil
+      expect(described_class.instance_variable_get(:@inline_cache)[cache_key3]).not_to be_nil
+    end
+
+    it "returns 0 when cache is empty" do
+      described_class.clear_inline_cache
+      expect(described_class.cleanup_expired_cache).to eq(0)
     end
   end
 end

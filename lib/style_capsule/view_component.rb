@@ -1,7 +1,16 @@
 # frozen_string_literal: true
 
 require "digest/sha1"
-require "active_support/core_ext/string"
+# Conditionally require ActiveSupport string extensions if available
+# For non-Rails usage, these are optional
+# Check first to avoid exception handling overhead in common case (Rails apps)
+unless defined?(ActiveSupport) || String.method_defined?(:html_safe)
+  begin
+    require "active_support/core_ext/string"
+  rescue LoadError
+    # ActiveSupport not available - core functionality still works
+  end
+end
 
 module StyleCapsule
   # ViewComponent component concern for encapsulated CSS

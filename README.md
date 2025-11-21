@@ -2,7 +2,7 @@
 
 [![Gem Version](https://badge.fury.io/rb/style_capsule.svg?v=1.0.1)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/amkisko/style_capsule.rb/graph/badge.svg?token=2U6NXJOVVM)](https://codecov.io/gh/amkisko/style_capsule.rb)
 
-CSS scoping extension for Rails components. Provides attribute-based style encapsulation for Phlex, ViewComponent, and ERB templates to prevent style leakage between components. Includes configurable caching strategies for optimal performance.
+CSS scoping extension for Ruby components. Provides attribute-based style encapsulation for Phlex, ViewComponent, and ERB templates to prevent style leakage between components. Works with Rails and can be used standalone in other Ruby frameworks (Sinatra, Hanami, etc.) or plain Ruby scripts. Includes configurable caching strategies for optimal performance.
 
 Sponsored by [Kisko Labs](https://www.kiskolabs.com).
 
@@ -161,8 +161,8 @@ Then in your layout:
 
 ```erb
 <head>
-  <%= stylesheet_registrymap_tags %>
-  <%= stylesheet_registrymap_tags(namespace: :admin) %>
+  <%= stylesheet_registry_tags %>
+  <%= stylesheet_registry_tags(namespace: :admin) %>
 </head>
 ```
 
@@ -170,7 +170,7 @@ Or in Phlex (requires including `StyleCapsule::PhlexHelper`):
 
 ```ruby
 head do
-  stylesheet_registrymap_tags
+  stylesheet_registry_tags
 end
 ```
 
@@ -205,7 +205,7 @@ def call
 end
 ```
 
-Registered files are rendered via `stylesheet_registrymap_tags` in your layout, just like inline CSS.
+Registered files are rendered via `stylesheet_registry_tags` in your layout, just like inline CSS.
 
 ## Caching Strategies
 
@@ -332,18 +332,96 @@ end
 - Component-scoped selectors: `:host`, `:host(.active)`, `:host-context(.theme-dark)`
 - Media queries: `@media (max-width: 768px) { ... }`
 
+## Requirements
+
+- Ruby >= 3.0
+- Rails >= 6.0, < 9.0 (optional, for Rails integration)
+- ActiveSupport >= 6.0, < 9.0 (optional, for Rails integration)
+
+**Note**: The gem can be used without Rails! See [Non-Rails Support](#non-rails-support) below.
+
+## Non-Rails Support
+
+StyleCapsule can be used without Rails! The core functionality is framework-agnostic.
+
+### Standalone Usage
+
+```ruby
+require 'style_capsule'
+
+# Direct CSS processing
+css = ".section { color: red; }"
+capsule_id = "abc123"
+scoped = StyleCapsule::CssProcessor.scope_selectors(css, capsule_id)
+# => "[data-capsule=\"abc123\"] .section { color: red; }"
+```
+
+### Phlex Without Rails
+
+```ruby
+require 'phlex'
+require 'style_capsule'
+
+class MyComponent < Phlex::HTML
+  include StyleCapsule::Component
+  
+  def component_styles
+    <<~CSS
+      .section { color: red; }
+    CSS
+  end
+  
+  def view_template
+    div(class: "section") { "Hello" }
+  end
+end
+```
+
+### Sinatra
+
+```ruby
+require 'sinatra'
+require 'style_capsule'
+
+class MyApp < Sinatra::Base
+  helpers StyleCapsule::StandaloneHelper
+  
+  get '/' do
+    erb :index
+  end
+end
+```
+
+```erb
+<!-- views/index.erb -->
+<%= style_capsule do %>
+  <style>
+    .section { color: red; }
+  </style>
+  <div class="section">Content</div>
+<% end %>
+```
+
+### Stylesheet Registry Without Rails
+
+The stylesheet registry automatically uses thread-local storage when ActiveSupport is not available:
+
+```ruby
+require 'style_capsule'
+
+# Works without Rails
+StyleCapsule::StylesheetRegistry.register_inline(".test { color: red; }", namespace: :test)
+stylesheets = StyleCapsule::StylesheetRegistry.request_inline_stylesheets
+```
+
+For more details, see [docs/non_rails_support.md](docs/non_rails_support.md).
+
 ## How It Works
 
 1. **Scope ID Generation**: Each component class gets a unique scope ID based on its class name (shared across all instances)
 2. **CSS Rewriting**: CSS selectors are rewritten to include `[data-capsule="..."]` attribute selectors
 3. **HTML Wrapping**: Component content is automatically wrapped in a scoped element
 4. **No Class Renaming**: Class names remain unchanged (unlike Shadow DOM)
-
-## Requirements
-
-- Ruby >= 3.0
-- Rails >= 7.0, < 9.0
-- ActiveSupport >= 7.0, < 9.0
 
 ## Development
 
@@ -395,4 +473,4 @@ For detailed security information, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-The gem is available as open source under the terms of the [MIT License](LICENSE.md).
+The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).

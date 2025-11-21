@@ -52,7 +52,7 @@ module StyleCapsule
 
         @output_dir = if output_dir
           output_dir.is_a?(Pathname) ? output_dir : Pathname.new(output_dir.to_s)
-        elsif defined?(Rails) && Rails.root
+        elsif rails_available?
           Rails.root.join(DEFAULT_OUTPUT_DIR)
         else
           Pathname.new(DEFAULT_OUTPUT_DIR)
@@ -154,11 +154,17 @@ module StyleCapsule
         @enabled != false
       end
 
+      # Check if Rails is available
+      # This method can be stubbed in tests to test fallback paths
+      def rails_available?
+        defined?(Rails) && Rails.respond_to?(:root) && Rails.root
+      end
+
       private
 
       # Get output directory (with default)
       def output_directory
-        @output_dir ||= if defined?(Rails) && Rails.root
+        @output_dir ||= if rails_available?
           Rails.root.join(DEFAULT_OUTPUT_DIR)
         else
           Pathname.new(DEFAULT_OUTPUT_DIR)
@@ -206,7 +212,7 @@ module StyleCapsule
 
       # Get Rails assets root (app/assets)
       def rails_assets_root
-        if defined?(Rails) && Rails.root
+        if rails_available?
           Rails.root.join("app/assets")
         else
           Pathname.new("app/assets")

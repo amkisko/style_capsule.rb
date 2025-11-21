@@ -273,6 +273,49 @@ RSpec.describe StyleCapsule::ViewComponent do
       expect(component_class.stylesheet_namespace).to eq(:admin)
     end
 
+    it "accepts string cache_strategy" do
+      component_class.stylesheet_registry cache_strategy: "time", cache_ttl: 3600
+      expect(component_class.inline_cache_strategy).to eq(:time)
+      expect(component_class.inline_cache_ttl).to eq(3600)
+    end
+
+    it "rejects invalid cache_strategy string" do
+      expect {
+        component_class.stylesheet_registry cache_strategy: "invalid"
+      }.to raise_error(ArgumentError, /cache_strategy must be/)
+    end
+
+    it "handles nil cache_strategy" do
+      component_class.stylesheet_registry cache_strategy: nil
+      expect(component_class.inline_cache_strategy).to eq(:none)
+    end
+
+    it "rejects invalid cache_strategy type" do
+      expect {
+        component_class.stylesheet_registry cache_strategy: 123
+      }.to raise_error(ArgumentError, /cache_strategy must be a Symbol, String, or Proc/)
+    end
+
+    it "rejects invalid cache_strategy symbol" do
+      expect {
+        component_class.stylesheet_registry cache_strategy: :invalid_symbol
+      }.to raise_error(ArgumentError, /cache_strategy must be/)
+    end
+
+    it "supports deprecated head_rendering! method" do
+      component_class.send(:head_rendering!)
+      expect(component_class.head_rendering?).to be true
+    end
+
+    it "accepts proc as cache_strategy" do
+      cache_proc = ->(css, capsule_id, namespace) {
+        ["key_#{capsule_id}", css.length > 50, Time.current + 1800]
+      }
+      component_class.stylesheet_registry cache_strategy: cache_proc
+      expect(component_class.inline_cache_strategy).to eq(:proc)
+      expect(component_class.inline_cache_proc).to eq(cache_proc)
+    end
+
     it "registers inline CSS for head rendering when enabled" do
       component_class.stylesheet_registry
       StyleCapsule::StylesheetRegistry.clear
@@ -296,6 +339,21 @@ RSpec.describe StyleCapsule::ViewComponent do
       # Inline CSS is registered for head rendering, so registry has content
       expect(StyleCapsule::StylesheetRegistry.any?).to be true
     end
+
+    describe ".stylesheet_link_options" do
+      it "sets stylesheet link options" do
+        options = {"data-turbo-track": "reload"}
+        component_class.stylesheet_link_options(options)
+        expect(component_class.stylesheet_link_options).to eq(options)
+      end
+
+      it "returns nil when options are not set" do
+        fresh_class = Class.new(ViewComponent::Base) do
+          include StyleCapsule::ViewComponent
+        end
+        expect(fresh_class.stylesheet_link_options).to be_nil
+      end
+    end
   end
 
   describe "class methods" do
@@ -304,6 +362,41 @@ RSpec.describe StyleCapsule::ViewComponent do
         component_class.capsule_id("custom-123")
         expect(component_class.custom_capsule_id).to eq("custom-123")
         expect(component.component_capsule).to eq("custom-123")
+      end
+
+      it "returns nil when capsule_id is not set" do
+        fresh_class = Class.new(ViewComponent::Base) do
+          include StyleCapsule::ViewComponent
+        end
+        expect(fresh_class.capsule_id).to be_nil
+      end
+    end
+
+    describe ".css_scoping_strategy" do
+      it "inherits strategy from parent class" do
+        parent_class = Class.new(ViewComponent::Base) do
+          include StyleCapsule::ViewComponent
+        end
+        # Give parent class a name for ViewComponent compatibility
+        Object.const_set("ParentClass_#{parent_class.object_id}", parent_class) unless parent_class.name
+        parent_class.css_scoping_strategy(:nesting)
+
+        child_class = Class.new(parent_class) do
+          include StyleCapsule::ViewComponent
+        end
+        # Give child class a name for ViewComponent compatibility
+        Object.const_set("ChildClass_#{child_class.object_id}", child_class) unless child_class.name
+
+        expect(child_class.css_scoping_strategy).to eq(:nesting)
+      end
+
+      it "defaults to selector_patching when no strategy set" do
+        fresh_class = Class.new(ViewComponent::Base) do
+          include StyleCapsule::ViewComponent
+        end
+        # Give class a name for ViewComponent compatibility
+        Object.const_set("FreshClass_#{fresh_class.object_id}", fresh_class) unless fresh_class.name
+        expect(fresh_class.css_scoping_strategy).to eq(:selector_patching)
       end
     end
 

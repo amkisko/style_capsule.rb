@@ -36,17 +36,17 @@ module StyleCapsule
       StyleCapsule::StylesheetRegistry.register(file_path, namespace: namespace, **options)
     end
 
-    # Render StyleCapsule registered stylesheets (similar to javascript_importmap_tags)
+    # Render StyleCapsule registered stylesheets
     #
     # Usage in Phlex layouts:
     #   head do
-    #     stylesheet_registrymap_tags
-    #     stylesheet_registrymap_tags(namespace: :admin)
+    #     stylesheet_registry_tags
+    #     stylesheet_registry_tags(namespace: :admin)
     #   end
     #
     # @param namespace [Symbol, String, nil] Optional namespace to render (nil/blank renders all)
     # @return [void] Renders stylesheet tags via raw
-    def stylesheet_registrymap_tags(namespace: nil)
+    def stylesheet_registry_tags(namespace: nil)
       output = StyleCapsule::StylesheetRegistry.render_head_stylesheets(view_context, namespace: namespace)
       # Phlex's raw() requires the object to be marked as safe
       # Use Phlex's safe() if available, otherwise fall back to html_safe for test doubles
@@ -62,5 +62,9 @@ module StyleCapsule
       # Always return the output string for testing/compatibility
       output_string
     end
+
+    # @deprecated Use {#stylesheet_registry_tags} instead.
+    #   This method name will be removed in a future version.
+    alias_method :stylesheet_registrymap_tags, :stylesheet_registry_tags
   end
 end
