@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "digest/sha1"
+require "cgi"
 
 module StyleCapsule
   # Standalone helper module for use without Rails
@@ -189,7 +190,7 @@ module StyleCapsule
     # @param value [String] Value to escape
     # @return [String] Escaped value
     def escape_html_attr(value)
-      value.to_s.gsub('"', "&quot;").gsub("'", "&#39;")
+      CGI.escapeHTML(value.to_s)
     end
   end
 end

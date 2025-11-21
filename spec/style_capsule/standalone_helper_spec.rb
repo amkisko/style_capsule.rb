@@ -279,6 +279,11 @@ RSpec.describe StyleCapsule::StandaloneHelper do
   end
 
   describe "#escape_html_attr" do
+    it "escapes HTML special characters" do
+      result = helper.send(:escape_html_attr, 'Test "quote" & <tag>')
+      expect(result).to eq("Test &quot;quote&quot; &amp; &lt;tag&gt;")
+    end
+
     it "escapes double quotes" do
       result = helper.send(:escape_html_attr, 'Test "quote"')
       expect(result).to eq("Test &quot;quote&quot;")
@@ -287,6 +292,16 @@ RSpec.describe StyleCapsule::StandaloneHelper do
     it "escapes single quotes" do
       result = helper.send(:escape_html_attr, "Test 'quote'")
       expect(result).to eq("Test &#39;quote&#39;")
+    end
+
+    it "escapes ampersands" do
+      result = helper.send(:escape_html_attr, "A & B")
+      expect(result).to eq("A &amp; B")
+    end
+
+    it "escapes less-than and greater-than to prevent XSS" do
+      result = helper.send(:escape_html_attr, "<script>alert('xss')</script>")
+      expect(result).to eq("&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;")
     end
 
     it "converts non-string to string" do

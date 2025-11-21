@@ -193,7 +193,7 @@ class HeadRenderer
 end
 
 renderer = HeadRenderer.new
-stylesheets = renderer.stylesheet_registrymap_tags
+stylesheets = renderer.stylesheet_registry_tags
 
 puts "Registered Stylesheets:"
 puts stylesheets
