@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.0.2 (2025-11-21)
+
+- Fix default output directory for CSS files to app/assets/builds/capsules/
+
 ## 1.0.1 (2025-11-21)
 
 - Update ViewComponent dependency to version 4.0 and adjust compatibility in tests
