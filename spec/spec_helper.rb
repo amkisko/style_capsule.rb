@@ -152,8 +152,11 @@ RSpec.configure do |config|
 
   # Setup for integration tests
   config.before(:each, type: :integration) do
-    # Reset CurrentAttributes context
-    StyleCapsule::StylesheetRegistry.reset
+    # Reset CurrentAttributes context (if available)
+    if StyleCapsule::StylesheetRegistry.respond_to?(:reset) &&
+        StyleCapsule::StylesheetRegistry.using_current_attributes?
+      StyleCapsule::StylesheetRegistry.reset
+    end
     # Clear registries before each integration test
     StyleCapsule::StylesheetRegistry.clear
     StyleCapsule::StylesheetRegistry.clear_manifest
