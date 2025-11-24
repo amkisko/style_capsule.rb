@@ -69,9 +69,14 @@ RSpec.describe "style_capsule rake tasks" do
   def create_phlex_component(name, &block)
     skip "Phlex not available" unless defined?(Phlex::HTML)
 
-    component_class = Class.new(Phlex::HTML, &block)
+    # Create class without block first to get a name
+    component_class = Class.new(Phlex::HTML)
     const_name = "RakeTest#{name}_#{component_class.object_id}"
-    Object.const_set(const_name, component_class) unless component_class.name
+    Object.const_set(const_name, component_class)
+
+    # Now evaluate the block (which includes StyleCapsule::Component) so it gets registered
+    component_class.class_eval(&block) if block_given?
+
     @created_components << component_class
     component_class
   end
@@ -79,9 +84,14 @@ RSpec.describe "style_capsule rake tasks" do
   def create_view_component(name, &block)
     skip "ViewComponent not available" unless defined?(ViewComponent::Base)
 
-    component_class = Class.new(ViewComponent::Base, &block)
+    # Create class without block first to get a name
+    component_class = Class.new(ViewComponent::Base)
     const_name = "RakeTest#{name}_#{component_class.object_id}"
-    Object.const_set(const_name, component_class) unless component_class.name
+    Object.const_set(const_name, component_class)
+
+    # Now evaluate the block (which includes StyleCapsule::ViewComponent) so it gets registered
+    component_class.class_eval(&block) if block_given?
+
     @created_components << component_class
     component_class
   end
@@ -108,7 +118,7 @@ RSpec.describe "style_capsule rake tasks" do
           end
         end
 
-        # Force the class to be registered in ObjectSpace by creating an instance
+        # Class is automatically registered when including StyleCapsule::Component
         component_class.new
 
         # Capture output
@@ -143,7 +153,7 @@ RSpec.describe "style_capsule rake tasks" do
           end
         end
 
-        # Force the class to be registered in ObjectSpace by creating an instance
+        # Class is automatically registered when including StyleCapsule::Component
         component_class.new
         expect(component_class.inline_cache_strategy).to eq(:file)
         expect(component_class.respond_to?(:component_styles, false)).to be true
@@ -201,7 +211,7 @@ RSpec.describe "style_capsule rake tasks" do
           end
         end
 
-        # Force the class to be registered in ObjectSpace by creating an instance
+        # Class is automatically registered when including StyleCapsule::Component
         # This will fail, but that's expected - we're testing error handling
         begin
           component_class.new
@@ -218,7 +228,7 @@ RSpec.describe "style_capsule rake tasks" do
 
         # Should output skip message (if component was found and skipped)
         output_string = output.string
-        # The component might not be found by ObjectSpace if it can't be instantiated
+        # The component might not be found if it can't be instantiated
         # So we just verify the task completes without error
         # But if it is found, it should output a skip message
         if output_string.include?("Skipped")

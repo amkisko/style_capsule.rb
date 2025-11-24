@@ -89,6 +89,9 @@ module StyleCapsule
 
       # Use prepend to wrap view_template method
       base.prepend(ViewTemplateWrapper)
+
+      # Register class for Rails-friendly tracking
+      ClassRegistry.register(base)
     end
 
     module ClassMethods

@@ -31,26 +31,16 @@ module StyleCapsule
       # This prevents memory leaks from stale cache entries during code reloading
       if Rails.env.development?
         config.to_prepare do
-          # Clear CSS caches for all classes that include StyleCapsule modules
-          # Skip singleton classes and handle errors gracefully
-          ObjectSpace.each_object(Class) do |klass|
-            # Skip singleton classes and classes without names (they can cause errors)
-            # Singleton classes don't have proper names and can't be safely checked
-            # Use fallback for blank? if ActiveSupport not available
-            name = klass.name
-            next if name.nil? || (name.respond_to?(:blank?) ? name.blank? : name.to_s.strip.empty?)
-            next if klass.singleton_class?
-
-            # Use method_defined? instead of respond_to? to avoid triggering delegation
-            # that might cause errors with singleton classes or other edge cases
-            begin
-              if klass.method_defined?(:clear_css_cache, false) || klass.private_method_defined?(:clear_css_cache)
-                klass.clear_css_cache
-              end
-            rescue
-              # Skip classes that cause errors (singleton classes, delegation issues, etc.)
-              next
+          # Use Rails-friendly class registry instead of ObjectSpace iteration
+          # This avoids issues with gems that override Class#name (e.g., Faker)
+          StyleCapsule::ClassRegistry.each do |klass|
+            # Clear CSS cache if the class has this method
+            if klass.method_defined?(:clear_css_cache, false) || klass.private_method_defined?(:clear_css_cache)
+              klass.clear_css_cache
             end
+          rescue
+            # Skip classes that cause errors (unloaded classes, etc.)
+            next
           end
 
           # Clear stylesheet manifest to allow re-registration during code reload

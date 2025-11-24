@@ -92,6 +92,7 @@ module StyleCapsule
   require_relative "style_capsule/css_processor"
   require_relative "style_capsule/css_file_writer"
   require_relative "style_capsule/stylesheet_registry"
+  require_relative "style_capsule/class_registry"
   require_relative "style_capsule/component_styles_support"
   require_relative "style_capsule/component"
   require_relative "style_capsule/standalone_helper"

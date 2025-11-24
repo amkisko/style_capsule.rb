@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 1.2.0 (2025-11-24)
+
+- Added `StyleCapsule::ClassRegistry` for Rails-friendly class tracking without ObjectSpace iteration
+- Fixed development environment bug where `ObjectSpace.each_object(Class)` could trigger errors with gems that override `Class#name` (e.g., Faker)
+- Improved `ComponentBuilder` to use ClassRegistry first, with ObjectSpace fallback for compatibility
+- Classes are now automatically registered when including `StyleCapsule::Component` or `StyleCapsule::ViewComponent`
+- Better performance in development mode by tracking only relevant classes instead of iterating all classes
+- Enhanced error handling for classes that cause issues during iteration
+
 ## 1.1.0 (2025-11-21)
 
 - Made Rails dependencies optional: `railties` and `activesupport` moved to development dependencies

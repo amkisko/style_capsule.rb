@@ -48,33 +48,74 @@ RSpec.describe StyleCapsule::ComponentBuilder do
       end
 
       it "finds Phlex components with StyleCapsule::Component" do
+        # Create a named class so it gets registered automatically
+        klass_name = "TestPhlexComponent_#{SecureRandom.hex(4)}"
         component_class = Class.new(Phlex::HTML) do
-          include StyleCapsule::Component
-
           def view_template
             div { "Test" }
           end
         end
 
-        # Force the class to be registered in ObjectSpace
-        component_class.new
+        # Set constant first so class has a name
+        Object.const_set(klass_name, component_class)
 
-        components = described_class.find_phlex_components
-        expect(components).to include(component_class)
+        begin
+          # Now include the module - this will register the class
+          component_class.include(StyleCapsule::Component)
+
+          components = described_class.find_phlex_components
+          expect(components).to include(component_class)
+        ensure
+          Object.send(:remove_const, klass_name) if Object.const_defined?(klass_name)
+          StyleCapsule::ClassRegistry.clear
+        end
       end
 
       it "does not find Phlex components without StyleCapsule::Component" do
+        # Create a named class that doesn't include StyleCapsule::Component
+        klass_name = "TestPhlexComponentNoStyle_#{SecureRandom.hex(4)}"
         component_class = Class.new(Phlex::HTML) do
           def view_template
             div { "Test" }
           end
         end
 
-        # Force the class to be registered in ObjectSpace
-        component_class.new
+        # Set constant so class has a name
+        Object.const_set(klass_name, component_class)
 
-        components = described_class.find_phlex_components
-        expect(components).not_to include(component_class)
+        begin
+          # Should not be found since it doesn't include StyleCapsule::Component
+          components = described_class.find_phlex_components
+          expect(components).not_to include(component_class)
+        ensure
+          Object.send(:remove_const, klass_name) if Object.const_defined?(klass_name)
+        end
+      end
+
+      it "handles classes that raise errors in ClassRegistry.each" do
+        # Create a class that will cause an error when checking inheritance
+        error_class = Class.new(Phlex::HTML) do
+          include StyleCapsule::Component
+
+          def self.<(other)
+            raise StandardError, "Inheritance check error"
+          end
+
+          def view_template
+            div { "Test" }
+          end
+        end
+
+        # Register it manually
+        StyleCapsule::ClassRegistry.register(error_class)
+
+        # Should not raise an error
+        expect {
+          components = described_class.find_phlex_components
+          expect(components).not_to include(error_class)
+        }.not_to raise_error
+
+        StyleCapsule::ClassRegistry.clear
       end
     end
   end
@@ -83,6 +124,45 @@ RSpec.describe StyleCapsule::ComponentBuilder do
     it "returns empty array when ViewComponent is not available" do
       allow(described_class).to receive(:view_component_available?).and_return(false)
       expect(described_class.find_view_components).to eq([])
+    end
+
+    context "when ViewComponent is available" do
+      before do
+        skip "ViewComponent not available" unless defined?(ViewComponent::Base)
+      end
+
+      it "handles errors in ClassRegistry.each gracefully" do
+        # Create a class that will cause an error when checking inheritance
+        error_class = Class.new(ViewComponent::Base) do
+          include StyleCapsule::ViewComponent
+
+          def self.<(other)
+            raise StandardError, "Inheritance check error"
+          end
+        end
+
+        # Register it manually
+        StyleCapsule::ClassRegistry.register(error_class)
+
+        # Should not raise an error
+        expect {
+          components = described_class.find_view_components
+          expect(components).not_to include(error_class)
+        }.not_to raise_error
+
+        StyleCapsule::ClassRegistry.clear
+      end
+
+      it "handles outer rescue block when ViewComponent has loading issues" do
+        # Mock ClassRegistry.each to raise an error
+        allow(StyleCapsule::ClassRegistry).to receive(:each).and_raise(StandardError, "ViewComponent loading error")
+
+        # Should not raise an error, should return empty array
+        expect {
+          components = described_class.find_view_components
+          expect(components).to eq([])
+        }.not_to raise_error
+      end
     end
 
     # ViewComponent tests removed - ViewComponent requires Rails to be fully initialized

@@ -89,6 +89,9 @@ module StyleCapsule
 
       # Use prepend to wrap call method
       base.prepend(CallWrapper)
+
+      # Register class for Rails-friendly tracking
+      ClassRegistry.register(base)
     end
 
     module ClassMethods

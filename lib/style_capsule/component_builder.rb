@@ -21,34 +21,47 @@ module StyleCapsule
 
       # Find all Phlex components that use StyleCapsule
       #
+      # Uses ClassRegistry to find registered components (Rails-friendly, avoids expensive ObjectSpace scanning).
+      # Classes are automatically registered when they include StyleCapsule::Component.
+      #
       # @return [Array<Class>] Array of component classes
       def find_phlex_components
         return [] unless phlex_available?
 
         components = []
-        ObjectSpace.each_object(Class) do |klass|
+
+        # Use the registry (Rails-friendly, avoids expensive ObjectSpace scanning)
+        ClassRegistry.each do |klass|
           if klass < Phlex::HTML && klass.included_modules.include?(StyleCapsule::Component)
             components << klass
           end
+        rescue
+          # Skip classes that cause errors (inheritance checks, etc.)
+          next
         end
+
         components
       end
 
       # Find all ViewComponent components that use StyleCapsule
+      #
+      # Uses ClassRegistry to find registered components (Rails-friendly, avoids expensive ObjectSpace scanning).
+      # Classes are automatically registered when they include StyleCapsule::ViewComponent.
       #
       # @return [Array<Class>] Array of component classes
       def find_view_components
         return [] unless view_component_available?
 
         components = []
+
         begin
-          ObjectSpace.each_object(Class) do |klass|
+          # Use the registry (Rails-friendly, avoids expensive ObjectSpace scanning)
+          ClassRegistry.each do |klass|
             if klass < ViewComponent::Base && klass.included_modules.include?(StyleCapsule::ViewComponent)
               components << klass
             end
           rescue
-            # Skip this class if checking inheritance triggers ViewComponent loading errors
-            # (e.g., ViewComponent 2.83.0 has a bug with Gem::Version#to_f)
+            # Skip classes that cause errors (inheritance checks, etc.)
             next
           end
         rescue
@@ -56,6 +69,7 @@ module StyleCapsule
           # Silently skip ViewComponent components if there's an error
           # This allows the rake task to continue with Phlex components
         end
+
         components
       end
 
