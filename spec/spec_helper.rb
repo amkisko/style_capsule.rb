@@ -3,6 +3,8 @@ require "simplecov-cobertura"
 
 SimpleCov.start do
   track_files "{lib,app}/**/*.rb"
+  add_filter "/lib/tasks/"
+  add_filter "/lib/style_capsule/version.rb"
   formatter SimpleCov::Formatter::MultiFormatter.new([
     SimpleCov::Formatter::HTMLFormatter,
     SimpleCov::Formatter::CoberturaFormatter
