@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 1.3.0 (2025-11-26)
+
+- Added comprehensive instrumentation via `StyleCapsule::Instrumentation` using ActiveSupport::Notifications
+- Instrumentation events for CSS processing (`style_capsule.css_processor.scope`) with duration and size metrics
+- Instrumentation events for CSS file writing (`style_capsule.css_file_writer.write`) with duration and size metrics
+- Added fallback directory support for CSS file writing when default location is read-only (e.g., Docker containers)
+- Automatic fallback to `/tmp/style_capsule` when primary output directory is not writable
+- Instrumentation events for fallback scenarios (`style_capsule.css_file_writer.fallback`, `style_capsule.css_file_writer.fallback_failure`)
+- Instrumentation events for write failures (`style_capsule.css_file_writer.write_failure`)
+- All instrumentation is zero-overhead when no subscribers are present (only calculates metrics when actively monitored)
+- Improved test coverage reporting and analysis tools
+- Added community guidelines and governance documents
+
 ## 1.2.0 (2025-11-24)
 
 - Added `StyleCapsule::ClassRegistry` for Rails-friendly class tracking without ObjectSpace iteration

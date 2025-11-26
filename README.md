@@ -1,6 +1,6 @@
 # style_capsule
 
-[![Gem Version](https://badge.fury.io/rb/style_capsule.svg?v=1.2.0)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/amkisko/style_capsule.rb/graph/badge.svg?token=2U6NXJOVVM)](https://codecov.io/gh/amkisko/style_capsule.rb)
+[![Gem Version](https://badge.fury.io/rb/style_capsule.svg?v=1.3.0)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/amkisko/style_capsule.rb/graph/badge.svg?token=2U6NXJOVVM)](https://codecov.io/gh/amkisko/style_capsule.rb)
 
 CSS scoping extension for Ruby components. Provides attribute-based style encapsulation for Phlex, ViewComponent, and ERB templates to prevent style leakage between components. Works with Rails and can be used standalone in other Ruby frameworks (Sinatra, Hanami, etc.) or plain Ruby scripts. Includes configurable caching strategies for optimal performance.
 
@@ -28,6 +28,8 @@ Then run `bundle install`.
 - **CSS Nesting support** (optional, more performant, requires modern browsers)
 - **Stylesheet registry** with thread-safe head rendering, namespace support, and compatibility with Propshaft and other asset bundlers
 - **Multiple cache strategies**: none, time-based, custom proc, and file-based (HTTP caching)
+- **Comprehensive instrumentation** via ActiveSupport::Notifications for monitoring and metrics
+- **Fallback directory support** for read-only filesystems (e.g., Docker containers)
 - **Security protections**: path traversal protection, input validation, size limits
 
 ## Usage
@@ -265,9 +267,12 @@ StyleCapsule::CssFileWriter.configure(
   output_dir: Rails.root.join("app/assets/builds/capsules"),
   filename_pattern: ->(component_class, capsule_id) {
     "capsule-#{capsule_id}.css"
-  }
+  },
+  fallback_dir: "/tmp/style_capsule"  # Optional, defaults to /tmp/style_capsule
 )
 ```
+
+**Fallback Directory:** In production environments where the app directory is read-only (e.g., Docker containers), StyleCapsule automatically falls back to writing files to `/tmp/style_capsule` when the default location is not writable. When using the fallback directory, the gem gracefully falls back to inline CSS rendering, keeping the UI fully functional.
 
 **Precompilation:**
 
@@ -279,6 +284,70 @@ bin/rails style_capsule:clear  # Clear generated files
 Files are automatically built during `bin/rails assets:precompile`.
 
 **Compatibility:** The stylesheet registry works with Propshaft, Sprockets, and other Rails asset bundlers. Static file paths are collected in a process-wide manifest (similar to Propshaft's approach), while inline CSS is stored per-request.
+
+## Instrumentation
+
+StyleCapsule provides comprehensive instrumentation via `ActiveSupport::Notifications` for monitoring CSS processing and file writing operations. All instrumentation is zero-overhead when no subscribers are present.
+
+### Available Events
+
+- `style_capsule.css_processor.scope` - CSS scoping operations with duration and size metrics
+- `style_capsule.css_file_writer.write` - CSS file write operations with duration and size metrics
+- `style_capsule.css_file_writer.fallback` - When fallback directory is used (read-only filesystem)
+- `style_capsule.css_file_writer.fallback_failure` - When both primary and fallback directories fail
+- `style_capsule.css_file_writer.write_failure` - Other write errors
+
+### Example: Monitoring CSS Processing
+
+```ruby
+# config/initializers/style_capsule.rb
+ActiveSupport::Notifications.subscribe("style_capsule.css_processor.scope") do |name, start, finish, id, payload|
+  duration_ms = (finish - start) * 1000
+  Rails.logger.info "CSS scoped in #{duration_ms.round(2)}ms, input: #{payload[:input_size]} bytes, output: #{payload[:output_size]} bytes"
+end
+```
+
+### Example: Monitoring File Writes
+
+```ruby
+ActiveSupport::Notifications.subscribe("style_capsule.css_file_writer.write") do |name, start, finish, id, payload|
+  duration_ms = (finish - start) * 1000
+  StatsD.timing("style_capsule.write.duration", duration_ms)
+  StatsD.histogram("style_capsule.write.size", payload[:size])
+end
+```
+
+### Example: Monitoring Fallback Scenarios
+
+```ruby
+ActiveSupport::Notifications.subscribe("style_capsule.css_file_writer.fallback") do |name, start, finish, id, payload|
+  Rails.logger.warn "StyleCapsule fallback used: #{payload[:component_class]} -> #{payload[:fallback_path]}"
+  # Exception info available: payload[:exception] and payload[:exception_object]
+  StatsD.increment("style_capsule.css_file_writer.fallback", tags: [
+    "component:#{payload[:component_class]}",
+    "error:#{payload[:exception].first}"
+  ])
+end
+```
+
+### Example: Error Reporting
+
+```ruby
+ActiveSupport::Notifications.subscribe("style_capsule.css_file_writer.fallback_failure") do |name, start, finish, id, payload|
+  ActionReporter.notify(
+    "StyleCapsule: CSS write failure (both primary and fallback failed)",
+    context: {
+      component_class: payload[:component_class],
+      original_path: payload[:original_path],
+      fallback_path: payload[:fallback_path],
+      original_exception: payload[:original_exception],
+      fallback_exception: payload[:fallback_exception]
+    }
+  )
+end
+```
+
+For more details, see the [ActiveSupport::Notifications documentation](https://guides.rubyonrails.org/active_support_instrumentation.html).
 
 ## Advanced Usage
 
