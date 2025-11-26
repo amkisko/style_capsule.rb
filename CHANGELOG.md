@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 1.4.0 (2025-11-26)
+
+- Added unified `style_capsule` class method for configuring all StyleCapsule settings (namespace, cache strategy, CSS scoping, head rendering) in a single call
+- Added automatic namespace fallback in `register_stylesheet` helper methods - when namespace is not specified, uses the component's configured namespace from `style_capsule`
+- Removed deprecated `head_rendering!` method (use `style_capsule` instead)
+- Removed deprecated `stylesheet_registrymap_tags` alias (use `stylesheet_registry_tags` instead)
+- Refactored namespace configuration to use instance variables instead of constants for better inheritance behavior
+
 ## 1.3.0 (2025-11-26)
 
 - Added comprehensive instrumentation via `StyleCapsule::Instrumentation` using ActiveSupport::Notifications

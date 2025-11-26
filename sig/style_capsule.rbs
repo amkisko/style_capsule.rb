@@ -43,7 +43,7 @@ module StyleCapsule
       def capsule_id: () -> String | nil
       def capsule_id: (String capsule_id) -> String
       def stylesheet_registry: (?namespace: Symbol | String | nil, ?cache_strategy: Symbol, ?cache_ttl: Integer | ActiveSupport::Duration | nil, ?cache_proc: Proc | nil) -> void
-      def style_capsule: (?namespace: Symbol | String | nil, ?cache_strategy: Symbol | String | Proc | nil, ?cache_ttl: Integer | ActiveSupport::Duration | nil, ?cache_proc: Proc | nil, ?css_scoping_strategy: Symbol | nil, ?head_rendering: bool | nil) -> void
+      def style_capsule: (?namespace: Symbol | String | nil, ?cache_strategy: Symbol | String | Proc | nil, ?cache_ttl: Integer | ActiveSupport::Duration | nil, ?cache_proc: Proc | nil, ?scoping_strategy: Symbol | nil, ?head_rendering: bool | nil) -> void
       def head_rendering?: () -> bool
       def stylesheet_namespace: () -> Symbol | String | nil
       def custom_capsule_id: () -> String | nil
@@ -54,7 +54,6 @@ module StyleCapsule
       def stylesheet_link_options: () -> Hash[untyped, untyped] | nil
       def stylesheet_link_options: (Hash[untyped, untyped] options) -> Hash[untyped, untyped]
       def css_scoping_strategy: () -> Symbol
-      def css_scoping_strategy: (Symbol strategy) -> Symbol
     end
 
     def component_capsule: () -> String
@@ -68,7 +67,7 @@ module StyleCapsule
       def capsule_id: () -> String | nil
       def capsule_id: (String capsule_id) -> String
       def stylesheet_registry: (?namespace: Symbol | String | nil, ?cache_strategy: Symbol, ?cache_ttl: Integer | ActiveSupport::Duration | nil, ?cache_proc: Proc | nil) -> void
-      def style_capsule: (?namespace: Symbol | String | nil, ?cache_strategy: Symbol | String | Proc | nil, ?cache_ttl: Integer | ActiveSupport::Duration | nil, ?cache_proc: Proc | nil, ?css_scoping_strategy: Symbol | nil, ?head_rendering: bool | nil) -> void
+      def style_capsule: (?namespace: Symbol | String | nil, ?cache_strategy: Symbol | String | Proc | nil, ?cache_ttl: Integer | ActiveSupport::Duration | nil, ?cache_proc: Proc | nil, ?scoping_strategy: Symbol | nil, ?head_rendering: bool | nil) -> void
       def head_rendering?: () -> bool
       def stylesheet_namespace: () -> Symbol | String | nil
       def custom_capsule_id: () -> String | nil
@@ -79,7 +78,6 @@ module StyleCapsule
       def stylesheet_link_options: () -> Hash[untyped, untyped] | nil
       def stylesheet_link_options: (Hash[untyped, untyped] options) -> Hash[untyped, untyped]
       def css_scoping_strategy: () -> Symbol
-      def css_scoping_strategy: (Symbol strategy) -> Symbol
     end
 
     def component_capsule: () -> String

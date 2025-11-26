@@ -227,26 +227,42 @@ module StyleCapsule
         end
       end
 
-      # Check if component uses head rendering
+      # Check if component uses head rendering (checks instance variable, then parent class, defaults to false)
+      #
+      # @return [Boolean] Whether head rendering is enabled (default: false)
       def head_rendering?
-        return false unless defined?(@head_rendering)
-        @head_rendering
+        if defined?(@head_rendering)
+          @head_rendering
+        elsif superclass.respond_to?(:head_rendering?, true)
+          superclass.head_rendering?
+        else
+          false
+        end
       end
 
       public :head_rendering?
 
-      # Get the namespace for stylesheet registry
+      # Get the namespace for stylesheet registry (checks instance variable, then parent class, defaults to nil)
+      #
+      # @return [Symbol, String, nil] The namespace identifier (default: nil)
       def stylesheet_namespace
-        @stylesheet_namespace if defined?(@stylesheet_namespace)
+        if defined?(@stylesheet_namespace) && @stylesheet_namespace
+          @stylesheet_namespace
+        elsif superclass.respond_to?(:stylesheet_namespace, true)
+          superclass.stylesheet_namespace
+        end
       end
 
       # Configure StyleCapsule settings
+      #
+      # All settings support class inheritance - child classes inherit settings from parent classes
+      # and can override them by calling style_capsule again with different values.
       #
       # @param namespace [Symbol, String, nil] Default namespace for stylesheets
       # @param cache_strategy [Symbol, String, Proc, nil] Cache strategy: :none (default), :time, :proc, :file
       # @param cache_ttl [Integer, ActiveSupport::Duration, nil] Time-to-live in seconds (for :time strategy)
       # @param cache_proc [Proc, nil] Custom cache proc (for :proc strategy)
-      # @param css_scoping_strategy [Symbol, nil] CSS scoping strategy: :selector_patching (default) or :nesting
+      # @param scoping_strategy [Symbol, nil] CSS scoping strategy: :selector_patching (default) or :nesting
       # @param head_rendering [Boolean, nil] Enable head rendering (default: true if any option is set, false otherwise)
       # @return [void]
       # @example Basic usage with namespace
@@ -266,11 +282,22 @@ module StyleCapsule
       #       namespace: :user,
       #       cache_strategy: :time,
       #       cache_ttl: 1.hour,
-      #       css_scoping_strategy: :nesting
+      #       scoping_strategy: :nesting
       #     )
       #   end
-      def style_capsule(namespace: nil, cache_strategy: nil, cache_ttl: nil, cache_proc: nil, css_scoping_strategy: nil, head_rendering: nil)
-        # Set namespace (instance variable, not inherited - each class has its own)
+      # @example Inheritance - child class inherits parent settings
+      #   class BaseComponent < ApplicationComponent
+      #     include StyleCapsule::ViewComponent
+      #     style_capsule namespace: :admin, cache_strategy: :time, cache_ttl: 1.hour
+      #   end
+      #
+      #   class ChildComponent < BaseComponent
+      #     # Inherits namespace: :admin, cache_strategy: :time, cache_ttl: 1.hour
+      #     # Can override specific settings:
+      #     style_capsule namespace: :user  # Overrides namespace, keeps cache settings
+      #   end
+      def style_capsule(namespace: nil, cache_strategy: nil, cache_ttl: nil, cache_proc: nil, scoping_strategy: nil, head_rendering: nil)
+        # Set namespace (stored in instance variable, but getter checks parent class for inheritance)
         if namespace
           @stylesheet_namespace = namespace
         end
@@ -279,16 +306,20 @@ module StyleCapsule
         if cache_strategy || cache_ttl || cache_proc
           normalized_strategy, normalized_proc = normalize_cache_strategy(cache_strategy || :none, cache_proc)
           @inline_cache_strategy = normalized_strategy
+          # Explicitly set cache_ttl (even if nil) to override parent's value when cache settings are changed
           @inline_cache_ttl = cache_ttl
           @inline_cache_proc = normalized_proc
         end
 
         # Configure CSS scoping strategy if provided
-        if css_scoping_strategy
-          self.css_scoping_strategy(css_scoping_strategy)
+        if scoping_strategy
+          unless [:selector_patching, :nesting].include?(scoping_strategy)
+            raise ArgumentError, "scoping_strategy must be :selector_patching or :nesting (got: #{scoping_strategy.inspect})"
+          end
+          @css_scoping_strategy = scoping_strategy
         end
 
-        # Enable head rendering if explicitly set or if any option is provided
+        # Enable head rendering if explicitly set or if any option is provided (except scoping_strategy)
         if head_rendering.nil?
           @head_rendering = true if namespace || cache_strategy || cache_ttl || cache_proc
         else
@@ -301,22 +332,55 @@ module StyleCapsule
         @custom_capsule_id if defined?(@custom_capsule_id)
       end
 
-      # Get inline cache strategy
+      # Get inline cache strategy (checks instance variable, then parent class, defaults to nil)
+      #
+      # @return [Symbol, nil] The cache strategy (default: nil)
       def inline_cache_strategy
-        @inline_cache_strategy if defined?(@inline_cache_strategy)
+        if defined?(@inline_cache_strategy) && @inline_cache_strategy
+          @inline_cache_strategy
+        elsif superclass.respond_to?(:inline_cache_strategy, true)
+          superclass.inline_cache_strategy
+        end
       end
 
-      # Get inline cache TTL
+      # Get inline cache TTL (checks instance variable, then parent class, defaults to nil)
+      #
+      # @return [Integer, ActiveSupport::Duration, nil] The cache TTL (default: nil)
       def inline_cache_ttl
-        @inline_cache_ttl if defined?(@inline_cache_ttl)
+        if defined?(@inline_cache_ttl)
+          @inline_cache_ttl
+        elsif superclass.respond_to?(:inline_cache_ttl, true)
+          superclass.inline_cache_ttl
+        end
       end
 
-      # Get inline cache proc
+      # Get inline cache proc (checks instance variable, then parent class, defaults to nil)
+      #
+      # @return [Proc, nil] The cache proc (default: nil)
       def inline_cache_proc
-        @inline_cache_proc if defined?(@inline_cache_proc)
+        if defined?(@inline_cache_proc)
+          @inline_cache_proc
+        elsif superclass.respond_to?(:inline_cache_proc, true)
+          superclass.inline_cache_proc
+        end
       end
 
       public :head_rendering?, :stylesheet_namespace, :style_capsule, :custom_capsule_id, :inline_cache_strategy, :inline_cache_ttl, :inline_cache_proc
+
+      # Get CSS scoping strategy (checks instance variable, then parent class, defaults to :selector_patching)
+      #
+      # @return [Symbol] The current scoping strategy (default: :selector_patching)
+      def css_scoping_strategy
+        if defined?(@css_scoping_strategy) && @css_scoping_strategy
+          @css_scoping_strategy
+        elsif superclass.respond_to?(:css_scoping_strategy, true)
+          superclass.css_scoping_strategy
+        else
+          :selector_patching
+        end
+      end
+
+      public :css_scoping_strategy
 
       # Set or get options for stylesheet_link_tag when using file-based caching
       #
@@ -339,58 +403,6 @@ module StyleCapsule
       end
 
       public :stylesheet_link_options
-
-      # Set or get CSS scoping strategy
-      #
-      # @param strategy [Symbol, nil] Scoping strategy: :selector_patching (default) or :nesting (omit to get current value)
-      #   - :selector_patching: Adds [data-capsule="..."] prefix to each selector (better browser support)
-      #   - :nesting: Wraps entire CSS in [data-capsule="..."] { ... } (more performant, requires CSS nesting support)
-      # @return [Symbol] The current scoping strategy (default: :selector_patching)
-      # @example Using CSS nesting (requires Chrome 112+, Firefox 117+, Safari 16.5+)
-      #   class MyComponent < ApplicationComponent
-      #     include StyleCapsule::ViewComponent
-      #     css_scoping_strategy :nesting  # More performant, no CSS parsing needed
-      #
-      #     def component_styles
-      #       <<~CSS
-      #         .section { color: red; }
-      #         .heading:hover { opacity: 0.8; }
-      #       CSS
-      #     end
-      #   end
-      #   # Output: [data-capsule="abc123"] { .section { color: red; } .heading:hover { opacity: 0.8; } }
-      # @example Using selector patching (default, better browser support)
-      #   class MyComponent < ApplicationComponent
-      #     include StyleCapsule::ViewComponent
-      #     css_scoping_strategy :selector_patching  # Default
-      #
-      #     def component_styles
-      #       <<~CSS
-      #         .section { color: red; }
-      #       CSS
-      #     end
-      #   end
-      #   # Output: [data-capsule="abc123"] .section { color: red; }
-      def css_scoping_strategy(strategy = nil)
-        if strategy.nil?
-          # Check if this class has a strategy set
-          if defined?(@css_scoping_strategy) && @css_scoping_strategy
-            @css_scoping_strategy
-          # Otherwise, check parent class (for inheritance)
-          elsif superclass.respond_to?(:css_scoping_strategy, true)
-            superclass.css_scoping_strategy
-          else
-            :selector_patching
-          end
-        else
-          unless [:selector_patching, :nesting].include?(strategy)
-            raise ArgumentError, "css_scoping_strategy must be :selector_patching or :nesting (got: #{strategy.inspect})"
-          end
-          @css_scoping_strategy = strategy
-        end
-      end
-
-      public :css_scoping_strategy
     end
 
     # Module that wraps call to add scoped wrapper

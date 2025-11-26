@@ -127,7 +127,7 @@ RSpec.describe StyleCapsule::ViewComponent do
       end
 
       it "can be set to :nesting" do
-        component_class.css_scoping_strategy(:nesting)
+        component_class.style_capsule scoping_strategy: :nesting
         expect(component_class.css_scoping_strategy).to eq(:nesting)
       end
 
@@ -140,7 +140,7 @@ RSpec.describe StyleCapsule::ViewComponent do
       end
 
       it "uses nesting strategy when configured" do
-        component_class.css_scoping_strategy(:nesting)
+        component_class.style_capsule scoping_strategy: :nesting
         component.component_capsule
         scoped_css = component.send(:scope_css, component.component_styles)
         # Nesting wraps entire CSS
@@ -158,7 +158,7 @@ RSpec.describe StyleCapsule::ViewComponent do
         expect(component_class.css_cache).to have_key("#{component_class.name}:#{scope}:selector_patching")
 
         # Then with nesting
-        component_class.css_scoping_strategy(:nesting)
+        component_class.style_capsule scoping_strategy: :nesting
         scoped_css2 = component.send(:scope_css, component.component_styles)
         expect(component_class.css_cache).to have_key("#{component_class.name}:#{scope}:nesting")
 
@@ -168,7 +168,7 @@ RSpec.describe StyleCapsule::ViewComponent do
 
       it "rejects invalid strategy" do
         expect {
-          component_class.css_scoping_strategy(:invalid)
+          component_class.style_capsule scoping_strategy: :invalid
         }.to raise_error(ArgumentError, /must be :selector_patching or :nesting/)
       end
 
@@ -177,7 +177,7 @@ RSpec.describe StyleCapsule::ViewComponent do
         base_class = Class.new(ViewComponent::Base) do
           include StyleCapsule::ViewComponent
 
-          css_scoping_strategy :nesting
+          style_capsule scoping_strategy: :nesting
 
           attr_accessor :view_context_double
 
@@ -218,7 +218,7 @@ RSpec.describe StyleCapsule::ViewComponent do
         base_class = Class.new(ViewComponent::Base) do
           include StyleCapsule::ViewComponent
 
-          css_scoping_strategy :nesting
+          style_capsule scoping_strategy: :nesting
 
           attr_accessor :view_context_double
 
@@ -235,7 +235,7 @@ RSpec.describe StyleCapsule::ViewComponent do
 
         # Create a child class that overrides with selector_patching
         child_class = Class.new(base_class) do
-          css_scoping_strategy :selector_patching
+          style_capsule scoping_strategy: :selector_patching
 
           def component_styles
             ".test { color: red; }"
@@ -254,6 +254,66 @@ RSpec.describe StyleCapsule::ViewComponent do
         expect(scoped_css).to include('[data-capsule="')
         expect(scoped_css).to include('"] .test')
         expect(scoped_css).not_to include('"] {')
+      end
+    end
+
+    describe ".style_capsule inheritance" do
+      it "supports inheritance - child class inherits all parent settings" do
+        base_class = Class.new(ViewComponent::Base) do
+          include StyleCapsule::ViewComponent
+        end
+        # Give base class a name for ViewComponent 4.x compatibility
+        Object.const_set("BaseClassInherit_#{base_class.object_id}", base_class) unless base_class.name
+        base_class.style_capsule(
+          namespace: :admin,
+          cache_strategy: :time,
+          cache_ttl: 1.hour,
+          scoping_strategy: :nesting,
+          head_rendering: true
+        )
+
+        child_class = Class.new(base_class) do
+          def component_styles
+            ".test { color: red; }"
+          end
+        end
+        # Give child class a name for ViewComponent 4.x compatibility
+        Object.const_set("ChildClassInherit_#{child_class.object_id}", child_class) unless child_class.name
+
+        # Child should inherit all settings from parent
+        expect(child_class.stylesheet_namespace).to eq(:admin)
+        expect(child_class.inline_cache_strategy).to eq(:time)
+        expect(child_class.inline_cache_ttl).to eq(1.hour)
+        expect(child_class.css_scoping_strategy).to eq(:nesting)
+        expect(child_class.head_rendering?).to be true
+      end
+
+      it "supports inheritance - child class can override specific settings" do
+        base_class = Class.new(ViewComponent::Base) do
+          include StyleCapsule::ViewComponent
+        end
+        # Give base class a name for ViewComponent 4.x compatibility
+        Object.const_set("BaseClassOverride_#{base_class.object_id}", base_class) unless base_class.name
+        base_class.style_capsule(
+          namespace: :admin,
+          cache_strategy: :time,
+          cache_ttl: 1.hour,
+          scoping_strategy: :nesting
+        )
+
+        child_class = Class.new(base_class) do
+          # Override only namespace, keep other settings
+          style_capsule namespace: :user
+        end
+        # Give child class a name for ViewComponent 4.x compatibility
+        Object.const_set("ChildClassOverride_#{child_class.object_id}", child_class) unless child_class.name
+
+        # Child should have overridden namespace
+        expect(child_class.stylesheet_namespace).to eq(:user)
+        # But should still inherit other settings
+        expect(child_class.inline_cache_strategy).to eq(:time)
+        expect(child_class.inline_cache_ttl).to eq(1.hour)
+        expect(child_class.css_scoping_strategy).to eq(:nesting)
       end
     end
   end
@@ -349,6 +409,62 @@ RSpec.describe StyleCapsule::ViewComponent do
         expect(fresh_class.stylesheet_link_options).to be_nil
       end
     end
+
+    describe ".inline_cache_ttl" do
+      it "returns nil when not set and superclass doesn't respond" do
+        fresh_class = Class.new(ViewComponent::Base) do
+          include StyleCapsule::ViewComponent
+        end
+        # Give class a name for ViewComponent compatibility
+        Object.const_set("FreshClassTTL_#{fresh_class.object_id}", fresh_class) unless fresh_class.name
+        expect(fresh_class.inline_cache_ttl).to be_nil
+      end
+
+      it "returns nil when explicitly set to nil" do
+        component_class.style_capsule cache_strategy: :none
+        expect(component_class.inline_cache_ttl).to be_nil
+      end
+    end
+
+    describe ".inline_cache_proc" do
+      it "returns the proc when set" do
+        cache_proc = ->(css, capsule_id, namespace) { ["key", true, Time.current + 1800] }
+        component_class.style_capsule cache_strategy: :proc, cache_proc: cache_proc
+        expect(component_class.inline_cache_proc).to eq(cache_proc)
+      end
+
+      it "inherits proc from parent class" do
+        base_class = Class.new(ViewComponent::Base) do
+          include StyleCapsule::ViewComponent
+        end
+        # Give base class a name for ViewComponent compatibility
+        Object.const_set("BaseClassProc_#{base_class.object_id}", base_class) unless base_class.name
+        cache_proc = ->(css, capsule_id, namespace) { ["key", true, Time.current + 1800] }
+        base_class.style_capsule cache_strategy: :proc, cache_proc: cache_proc
+
+        child_class = Class.new(base_class) do
+          # No style_capsule call - should inherit from parent
+        end
+        # Give child class a name for ViewComponent compatibility
+        Object.const_set("ChildClassProc_#{child_class.object_id}", child_class) unless child_class.name
+
+        expect(child_class.inline_cache_proc).to eq(cache_proc)
+      end
+
+      it "returns nil when not set and superclass doesn't respond" do
+        fresh_class = Class.new(ViewComponent::Base) do
+          include StyleCapsule::ViewComponent
+        end
+        # Give class a name for ViewComponent compatibility
+        Object.const_set("FreshClassProc_#{fresh_class.object_id}", fresh_class) unless fresh_class.name
+        expect(fresh_class.inline_cache_proc).to be_nil
+      end
+
+      it "returns nil when explicitly set to nil" do
+        component_class.style_capsule cache_strategy: :time
+        expect(component_class.inline_cache_proc).to be_nil
+      end
+    end
   end
 
   describe "class methods" do
@@ -374,7 +490,7 @@ RSpec.describe StyleCapsule::ViewComponent do
         end
         # Give parent class a name for ViewComponent compatibility
         Object.const_set("ParentClass_#{parent_class.object_id}", parent_class) unless parent_class.name
-        parent_class.css_scoping_strategy(:nesting)
+        parent_class.style_capsule scoping_strategy: :nesting
 
         child_class = Class.new(parent_class) do
           include StyleCapsule::ViewComponent

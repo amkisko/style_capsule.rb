@@ -109,7 +109,7 @@ RSpec.describe StyleCapsule::Component do
       end
 
       it "can be set to :nesting" do
-        component_class.css_scoping_strategy(:nesting)
+        component_class.style_capsule scoping_strategy: :nesting
         expect(component_class.css_scoping_strategy).to eq(:nesting)
       end
 
@@ -122,7 +122,7 @@ RSpec.describe StyleCapsule::Component do
       end
 
       it "uses nesting strategy when configured" do
-        component_class.css_scoping_strategy(:nesting)
+        component_class.style_capsule scoping_strategy: :nesting
         component.component_capsule
         scoped_css = component.send(:scope_css, component.component_styles)
         # Nesting wraps entire CSS
@@ -140,7 +140,7 @@ RSpec.describe StyleCapsule::Component do
         expect(component_class.css_cache).to have_key("#{component_class.name}:#{scope}:selector_patching")
 
         # Then with nesting
-        component_class.css_scoping_strategy(:nesting)
+        component_class.style_capsule scoping_strategy: :nesting
         scoped_css2 = component.send(:scope_css, component.component_styles)
         expect(component_class.css_cache).to have_key("#{component_class.name}:#{scope}:nesting")
 
@@ -150,7 +150,7 @@ RSpec.describe StyleCapsule::Component do
 
       it "rejects invalid strategy" do
         expect {
-          component_class.css_scoping_strategy(:invalid)
+          component_class.style_capsule scoping_strategy: :invalid
         }.to raise_error(ArgumentError, /must be :selector_patching or :nesting/)
       end
 
@@ -159,7 +159,7 @@ RSpec.describe StyleCapsule::Component do
         base_class = Class.new do
           include StyleCapsule::Component
 
-          css_scoping_strategy :nesting
+          style_capsule scoping_strategy: :nesting
         end
 
         # Create a child class that doesn't set its own strategy
@@ -186,12 +186,12 @@ RSpec.describe StyleCapsule::Component do
         base_class = Class.new do
           include StyleCapsule::Component
 
-          css_scoping_strategy :nesting
+          style_capsule scoping_strategy: :nesting
         end
 
         # Create a child class that overrides with selector_patching
         child_class = Class.new(base_class) do
-          css_scoping_strategy :selector_patching
+          style_capsule scoping_strategy: :selector_patching
 
           def component_styles
             ".test { color: red; }"
@@ -268,7 +268,7 @@ RSpec.describe StyleCapsule::Component do
       end
 
       it "configures CSS scoping strategy" do
-        component_class.style_capsule css_scoping_strategy: :nesting
+        component_class.style_capsule scoping_strategy: :nesting
         expect(component_class.css_scoping_strategy).to eq(:nesting)
         expect(component_class.head_rendering?).to be false
       end
@@ -290,8 +290,8 @@ RSpec.describe StyleCapsule::Component do
         expect(another_fresh_class.head_rendering?).to be true
       end
 
-      it "does not enable head rendering when only css_scoping_strategy is provided" do
-        component_class.style_capsule css_scoping_strategy: :nesting
+      it "does not enable head rendering when only scoping_strategy is provided" do
+        component_class.style_capsule scoping_strategy: :nesting
         expect(component_class.head_rendering?).to be false
       end
 
@@ -311,7 +311,7 @@ RSpec.describe StyleCapsule::Component do
           namespace: :admin,
           cache_strategy: :time,
           cache_ttl: 1.hour,
-          css_scoping_strategy: :nesting,
+          scoping_strategy: :nesting,
           head_rendering: true
         )
         expect(component_class.stylesheet_namespace).to eq(:admin)
@@ -319,6 +319,149 @@ RSpec.describe StyleCapsule::Component do
         expect(component_class.inline_cache_ttl).to eq(1.hour)
         expect(component_class.css_scoping_strategy).to eq(:nesting)
         expect(component_class.head_rendering?).to be true
+      end
+
+      it "supports inheritance - child class inherits all parent settings" do
+        base_class = Class.new do
+          include StyleCapsule::Component
+        end
+        base_class.style_capsule(
+          namespace: :admin,
+          cache_strategy: :time,
+          cache_ttl: 1.hour,
+          scoping_strategy: :nesting,
+          head_rendering: true
+        )
+
+        child_class = Class.new(base_class) do
+          def component_styles
+            ".test { color: red; }"
+          end
+        end
+
+        # Child should inherit all settings from parent
+        expect(child_class.stylesheet_namespace).to eq(:admin)
+        expect(child_class.inline_cache_strategy).to eq(:time)
+        expect(child_class.inline_cache_ttl).to eq(1.hour)
+        expect(child_class.css_scoping_strategy).to eq(:nesting)
+        expect(child_class.head_rendering?).to be true
+      end
+
+      it "supports inheritance - child class can override specific settings" do
+        base_class = Class.new do
+          include StyleCapsule::Component
+        end
+        base_class.style_capsule(
+          namespace: :admin,
+          cache_strategy: :time,
+          cache_ttl: 1.hour,
+          scoping_strategy: :nesting
+        )
+
+        child_class = Class.new(base_class) do
+          # Override only namespace, keep other settings
+          style_capsule namespace: :user
+        end
+
+        # Child should have overridden namespace
+        expect(child_class.stylesheet_namespace).to eq(:user)
+        # But should still inherit other settings
+        expect(child_class.inline_cache_strategy).to eq(:time)
+        expect(child_class.inline_cache_ttl).to eq(1.hour)
+        expect(child_class.css_scoping_strategy).to eq(:nesting)
+      end
+
+      it "supports inheritance - child class can override multiple settings" do
+        base_class = Class.new do
+          include StyleCapsule::Component
+        end
+        base_class.style_capsule(
+          namespace: :admin,
+          cache_strategy: :time,
+          cache_ttl: 1.hour,
+          scoping_strategy: :nesting
+        )
+
+        child_class = Class.new(base_class) do
+          # Override namespace and cache strategy
+          style_capsule namespace: :user, cache_strategy: :none
+        end
+
+        # Child should have overridden settings
+        expect(child_class.stylesheet_namespace).to eq(:user)
+        expect(child_class.inline_cache_strategy).to eq(:none)
+        # But should still inherit other settings
+        expect(child_class.css_scoping_strategy).to eq(:nesting)
+        # cache_ttl should be nil since cache_strategy was overridden to :none
+        expect(child_class.inline_cache_ttl).to be_nil
+      end
+
+      it "supports inheritance - grandchild class inherits from parent and grandparent" do
+        grandparent_class = Class.new do
+          include StyleCapsule::Component
+        end
+        grandparent_class.style_capsule namespace: :admin, cache_strategy: :time
+
+        parent_class = Class.new(grandparent_class) do
+          # Override namespace
+          style_capsule namespace: :user
+        end
+
+        child_class = Class.new(parent_class) do
+          # No style_capsule call - should inherit from parent
+        end
+
+        # Child should inherit from parent (not grandparent)
+        expect(child_class.stylesheet_namespace).to eq(:user)
+        expect(child_class.inline_cache_strategy).to eq(:time)
+      end
+    end
+
+    describe ".inline_cache_ttl" do
+      it "returns nil when not set and superclass doesn't respond" do
+        fresh_class = Class.new do
+          include StyleCapsule::Component
+        end
+        expect(fresh_class.inline_cache_ttl).to be_nil
+      end
+
+      it "returns nil when explicitly set to nil" do
+        component_class.style_capsule cache_strategy: :none
+        expect(component_class.inline_cache_ttl).to be_nil
+      end
+    end
+
+    describe ".inline_cache_proc" do
+      it "returns the proc when set" do
+        cache_proc = ->(css, capsule_id, namespace) { ["key", true, Time.current + 1800] }
+        component_class.style_capsule cache_strategy: :proc, cache_proc: cache_proc
+        expect(component_class.inline_cache_proc).to eq(cache_proc)
+      end
+
+      it "inherits proc from parent class" do
+        base_class = Class.new do
+          include StyleCapsule::Component
+        end
+        cache_proc = ->(css, capsule_id, namespace) { ["key", true, Time.current + 1800] }
+        base_class.style_capsule cache_strategy: :proc, cache_proc: cache_proc
+
+        child_class = Class.new(base_class) do
+          # No style_capsule call - should inherit from parent
+        end
+
+        expect(child_class.inline_cache_proc).to eq(cache_proc)
+      end
+
+      it "returns nil when not set and superclass doesn't respond" do
+        fresh_class = Class.new do
+          include StyleCapsule::Component
+        end
+        expect(fresh_class.inline_cache_proc).to be_nil
+      end
+
+      it "returns nil when explicitly set to nil" do
+        component_class.style_capsule cache_strategy: :time
+        expect(component_class.inline_cache_proc).to be_nil
       end
     end
 
@@ -390,7 +533,7 @@ RSpec.describe StyleCapsule::Component do
         parent_class = Class.new do
           include StyleCapsule::Component
         end
-        parent_class.css_scoping_strategy(:nesting)
+        parent_class.style_capsule scoping_strategy: :nesting
 
         child_class = Class.new(parent_class) do
           include StyleCapsule::Component
