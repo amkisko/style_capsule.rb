@@ -1,16 +1,20 @@
 require "simplecov"
-SimpleCov.start do
-  add_filter "/spec/"
-  add_filter { |source_file| source_file.lines.count < 5 }
-end
-
 require "simplecov-cobertura"
-SimpleCov.formatter = SimpleCov::Formatter::CoberturaFormatter
+
+SimpleCov.start do
+  track_files "{lib,app}/**/*.rb"
+  formatter SimpleCov::Formatter::MultiFormatter.new([
+    SimpleCov::Formatter::HTMLFormatter,
+    SimpleCov::Formatter::CoberturaFormatter
+  ])
+end
 
 require "rspec"
 require "rspec/mocks"
 require "active_support/all"
 require "ostruct"
+require "tmpdir"
+require "fileutils"
 
 # Mock Rails constant if it doesn't exist (needed for railties and ViewComponent)
 unless defined?(Rails)
@@ -141,6 +145,28 @@ require_relative "../lib/style_capsule"
 
 Dir[File.expand_path("support/**/*.rb", __dir__)].each { |f| require_relative f }
 
+# Configure CssFileWriter to use a temporary directory for all tests
+# This prevents tests from creating directories in the project root
+RSpec.configure do |config|
+  config.before(:suite) do
+    # Use a temporary directory for CSS file writing during tests
+    test_output_dir = Pathname.new(Dir.mktmpdir("style_capsule_spec_"))
+    StyleCapsule::CssFileWriter.configure(
+      output_dir: test_output_dir,
+      enabled: true
+    )
+  end
+
+  config.after(:suite) do
+    # Clean up test output directory
+    output_dir = StyleCapsule::CssFileWriter.output_dir
+    if output_dir && Dir.exist?(output_dir) && output_dir.to_s.include?("style_capsule_spec_")
+      StyleCapsule::CssFileWriter.clear_files
+      FileUtils.rm_rf(output_dir)
+    end
+  end
+end
+
 RSpec.configure do |config|
   # Include RSpec mocks for all tests
   config.include RSpec::Mocks::ExampleMethods
@@ -171,5 +197,18 @@ RSpec.configure do |config|
         StyleCapsule::StylesheetRegistry.using_current_attributes?
       StyleCapsule::StylesheetRegistry.reset
     end
+  end
+end
+
+# Run coverage analyzer after SimpleCov finishes writing coverage.xml
+# Use SimpleCov.at_exit to ensure our hook runs after the formatter writes files
+# We need to call the formatter first, then run our analyzer
+if ENV["SHOW_ZERO_COVERAGE"] == "1"
+  SimpleCov.at_exit do
+    # First, ensure the formatter runs (this writes coverage.xml)
+    SimpleCov.result.format!
+    # Then run our analyzer
+    require_relative "support/coverage_analyzer"
+    CoverageAnalyzer.run
   end
 end

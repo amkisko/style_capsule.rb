@@ -2,23 +2,26 @@
 
 ## Using rspec
 
-All tests should be run using `bin/rspec`
+All tests should be run using `bundle exec rspec`
 
 ```bash
 # Run all tests
-bin/rspec
+bundle exec rspec
 
 # Run with fail-fast (stop on first failure)
-bin/rspec --fail-fast
+bundle exec rspec --fail-fast
 
 # For verbose output
-DEBUG=1 bin/rspec
+DEBUG=1 bundle exec rspec
+
+# Show zero coverage lines
+SHOW_ZERO_COVERAGE=1 bundle exec rspec
 
 # Run single spec file at exact line number
-DEBUG=1 bin/rspec spec/style_capsule/css_processor_spec.rb:10
+DEBUG=1 bundle exec rspec spec/style_capsule/css_processor_spec.rb:10
 
 # Run with verbose logging
-DEBUG=1 DEVLOG_ENABLED=1 DEVLOG=1 LOGLOC=1 bin/rspec
+DEBUG=1 DEVLOG_ENABLED=1 DEVLOG=1 LOGLOC=1 bundle exec rspec
 ```
 
 ## Test Structure
@@ -43,13 +46,13 @@ Integration tests use the actual `phlex-rails` and `view_component` gems to veri
 
 ```bash
 # Run all integration tests
-bin/rspec spec/integration/
+bundle exec rspec spec/integration/
 
 # Run Phlex integration tests only
-bin/rspec spec/integration/phlex_integration_spec.rb
+bundle exec rspec spec/integration/phlex_integration_spec.rb
 
 # Run ViewComponent integration tests only
-bin/rspec spec/integration/view_component_integration_spec.rb
+bundle exec rspec spec/integration/view_component_integration_spec.rb
 ```
 
 Integration tests verify:
@@ -101,6 +104,31 @@ Since this is a gem library (not a Rails app), test data is typically:
 - Mock objects for Rails view context
 - Test doubles for Phlex components
 - No database fixtures or factories needed
+
+#### Test Output Directory Configuration
+
+**Important**: Tests are configured to use a temporary directory for CSS file writing to avoid creating directories in the project root.
+
+- `CssFileWriter` is automatically configured in `spec_helper.rb` to use a temporary directory (`/tmp/style_capsule_spec_*`)
+- Individual tests that need a specific output directory should configure it explicitly using `Dir.mktmpdir`
+- Tests should clean up their output directories in `after` blocks
+- The test suite automatically cleans up the default test output directory after all tests complete
+
+**Example**:
+```ruby
+RSpec.describe StyleCapsule::CssFileWriter do
+  let(:test_output_dir) { Pathname.new(Dir.mktmpdir) }
+
+  before do
+    StyleCapsule::CssFileWriter.configure(output_dir: test_output_dir)
+  end
+
+  after do
+    StyleCapsule::CssFileWriter.clear_files
+    FileUtils.rm_rf(test_output_dir) if Dir.exist?(test_output_dir)
+  end
+end
+```
 
 Example:
 
