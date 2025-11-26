@@ -239,6 +239,89 @@ RSpec.describe StyleCapsule::Component do
       expect(component_class.stylesheet_namespace).to eq(:admin)
     end
 
+    describe ".style_capsule" do
+      it "sets namespace" do
+        component_class.style_capsule namespace: :user
+        expect(component_class.stylesheet_namespace).to eq(:user)
+        expect(component_class.head_rendering?).to be true
+      end
+
+      it "sets namespace without enabling head rendering when head_rendering is false" do
+        component_class.style_capsule namespace: :user, head_rendering: false
+        expect(component_class.stylesheet_namespace).to eq(:user)
+        expect(component_class.head_rendering?).to be false
+      end
+
+      it "configures cache strategy" do
+        component_class.style_capsule cache_strategy: :time, cache_ttl: 3600
+        expect(component_class.inline_cache_strategy).to eq(:time)
+        expect(component_class.inline_cache_ttl).to eq(3600)
+        expect(component_class.head_rendering?).to be true
+      end
+
+      it "configures cache proc" do
+        cache_proc = ->(css, capsule_id, namespace) { ["key", true, Time.current + 1800] }
+        component_class.style_capsule cache_strategy: :proc, cache_proc: cache_proc
+        expect(component_class.inline_cache_strategy).to eq(:proc)
+        expect(component_class.inline_cache_proc).to eq(cache_proc)
+        expect(component_class.head_rendering?).to be true
+      end
+
+      it "configures CSS scoping strategy" do
+        component_class.style_capsule css_scoping_strategy: :nesting
+        expect(component_class.css_scoping_strategy).to eq(:nesting)
+        expect(component_class.head_rendering?).to be false
+      end
+
+      it "enables head rendering when any option is provided" do
+        component_class.style_capsule namespace: :admin
+        expect(component_class.head_rendering?).to be true
+
+        fresh_class = Class.new do
+          include StyleCapsule::Component
+        end
+        fresh_class.style_capsule cache_strategy: :time
+        expect(fresh_class.head_rendering?).to be true
+
+        another_fresh_class = Class.new do
+          include StyleCapsule::Component
+        end
+        another_fresh_class.style_capsule cache_ttl: 3600
+        expect(another_fresh_class.head_rendering?).to be true
+      end
+
+      it "does not enable head rendering when only css_scoping_strategy is provided" do
+        component_class.style_capsule css_scoping_strategy: :nesting
+        expect(component_class.head_rendering?).to be false
+      end
+
+      it "allows explicit head_rendering setting" do
+        component_class.style_capsule head_rendering: true
+        expect(component_class.head_rendering?).to be true
+
+        fresh_class = Class.new do
+          include StyleCapsule::Component
+        end
+        fresh_class.style_capsule head_rendering: false
+        expect(fresh_class.head_rendering?).to be false
+      end
+
+      it "configures all options together" do
+        component_class.style_capsule(
+          namespace: :admin,
+          cache_strategy: :time,
+          cache_ttl: 1.hour,
+          css_scoping_strategy: :nesting,
+          head_rendering: true
+        )
+        expect(component_class.stylesheet_namespace).to eq(:admin)
+        expect(component_class.inline_cache_strategy).to eq(:time)
+        expect(component_class.inline_cache_ttl).to eq(1.hour)
+        expect(component_class.css_scoping_strategy).to eq(:nesting)
+        expect(component_class.head_rendering?).to be true
+      end
+    end
+
     it "accepts string cache_strategy" do
       component_class.stylesheet_registry cache_strategy: "time", cache_ttl: 3600
       expect(component_class.inline_cache_strategy).to eq(:time)

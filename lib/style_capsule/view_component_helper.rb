@@ -14,9 +14,13 @@ module StyleCapsule
   #   end
   #
   # Usage in ViewComponent components:
-  #   def call
-  #     register_stylesheet("stylesheets/user/my_component")
-  #     content_tag(:div, "Content")
+  #   class MyComponent < ApplicationComponent
+  #     styles_namespace :user  # Set default namespace
+  #
+  #     def call
+  #       register_stylesheet("stylesheets/user/my_component")  # Uses :user namespace automatically
+  #       content_tag(:div, "Content")
+  #     end
   #   end
   module ViewComponentHelper
     # Register a stylesheet file for head rendering
@@ -28,11 +32,18 @@ module StyleCapsule
     #     content_tag(:div, "Content")
     #   end
     #
+    # If the component has a default namespace set via styles_namespace or stylesheet_registry,
+    # it will be used automatically when namespace is not explicitly provided.
+    #
     # @param file_path [String] Path to stylesheet (relative to app/assets/stylesheets)
-    # @param namespace [Symbol, String, nil] Optional namespace for separation (nil/blank uses default)
+    # @param namespace [Symbol, String, nil] Optional namespace for separation (nil/blank uses component's default or global default)
     # @param options [Hash] Options for stylesheet_link_tag
     # @return [void]
     def register_stylesheet(file_path, namespace: nil, **options)
+      # Use component's default namespace if not explicitly provided
+      if namespace.nil? && respond_to?(:class) && self.class.respond_to?(:stylesheet_namespace)
+        namespace = self.class.stylesheet_namespace
+      end
       StyleCapsule::StylesheetRegistry.register(file_path, namespace: namespace, **options)
     end
 

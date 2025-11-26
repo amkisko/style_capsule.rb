@@ -246,6 +246,62 @@ module StyleCapsule
         @stylesheet_namespace if defined?(@stylesheet_namespace)
       end
 
+      # Configure StyleCapsule settings
+      #
+      # @param namespace [Symbol, String, nil] Default namespace for stylesheets
+      # @param cache_strategy [Symbol, String, Proc, nil] Cache strategy: :none (default), :time, :proc, :file
+      # @param cache_ttl [Integer, ActiveSupport::Duration, nil] Time-to-live in seconds (for :time strategy)
+      # @param cache_proc [Proc, nil] Custom cache proc (for :proc strategy)
+      # @param css_scoping_strategy [Symbol, nil] CSS scoping strategy: :selector_patching (default) or :nesting
+      # @param head_rendering [Boolean, nil] Enable head rendering (default: true if any option is set, false otherwise)
+      # @return [void]
+      # @example Basic usage with namespace
+      #   class AdminComponent < ApplicationComponent
+      #     include StyleCapsule::ViewComponent
+      #     style_capsule namespace: :admin
+      #
+      #     def call
+      #       register_stylesheet("stylesheets/admin/dashboard")  # Uses :admin namespace automatically
+      #       content_tag(:div, "Content")
+      #     end
+      #   end
+      # @example With all options
+      #   class MyComponent < ApplicationComponent
+      #     include StyleCapsule::ViewComponent
+      #     style_capsule(
+      #       namespace: :user,
+      #       cache_strategy: :time,
+      #       cache_ttl: 1.hour,
+      #       css_scoping_strategy: :nesting
+      #     )
+      #   end
+      def style_capsule(namespace: nil, cache_strategy: nil, cache_ttl: nil, cache_proc: nil, css_scoping_strategy: nil, head_rendering: nil)
+        # Set namespace (instance variable, not inherited - each class has its own)
+        if namespace
+          @stylesheet_namespace = namespace
+        end
+
+        # Configure cache strategy if provided
+        if cache_strategy || cache_ttl || cache_proc
+          normalized_strategy, normalized_proc = normalize_cache_strategy(cache_strategy || :none, cache_proc)
+          @inline_cache_strategy = normalized_strategy
+          @inline_cache_ttl = cache_ttl
+          @inline_cache_proc = normalized_proc
+        end
+
+        # Configure CSS scoping strategy if provided
+        if css_scoping_strategy
+          self.css_scoping_strategy(css_scoping_strategy)
+        end
+
+        # Enable head rendering if explicitly set or if any option is provided
+        if head_rendering.nil?
+          @head_rendering = true if namespace || cache_strategy || cache_ttl || cache_proc
+        else
+          @head_rendering = head_rendering
+        end
+      end
+
       # Get the custom scope ID if set (alias for capsule_id getter)
       def custom_capsule_id
         @custom_capsule_id if defined?(@custom_capsule_id)
@@ -266,7 +322,7 @@ module StyleCapsule
         @inline_cache_proc if defined?(@inline_cache_proc)
       end
 
-      public :head_rendering?, :stylesheet_namespace, :custom_capsule_id, :inline_cache_strategy, :inline_cache_ttl, :inline_cache_proc
+      public :head_rendering?, :stylesheet_namespace, :style_capsule, :custom_capsule_id, :inline_cache_strategy, :inline_cache_ttl, :inline_cache_proc
 
       # Set or get options for stylesheet_link_tag when using file-based caching
       #

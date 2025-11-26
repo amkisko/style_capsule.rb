@@ -18,6 +18,7 @@ end
 # @example Phlex Component Usage
 #   class MyComponent < ApplicationComponent
 #     include StyleCapsule::Component
+#     style_capsule namespace: :user  # Configure namespace and other settings
 #
 #     def component_styles
 #       <<~CSS
@@ -29,6 +30,7 @@ end
 # @example ViewComponent Encapsulation Usage
 #   class MyComponent < ApplicationComponent
 #     include StyleCapsule::ViewComponent
+#     style_capsule namespace: :admin  # Configure namespace and other settings
 #
 #     def component_styles
 #       <<~CSS
@@ -51,8 +53,10 @@ end
 #   end
 #
 #   class MyComponent < ApplicationComponent
+#     style_capsule namespace: :user  # Configure namespace
+#
 #     def call
-#       register_stylesheet("stylesheets/user/my_component")
+#       register_stylesheet("stylesheets/user/my_component")  # Uses :user namespace automatically
 #       content_tag(:div, "Content", class: "section")
 #     end
 #   end
