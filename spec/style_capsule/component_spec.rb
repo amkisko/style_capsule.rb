@@ -370,11 +370,6 @@ RSpec.describe StyleCapsule::Component do
       }.to raise_error(ArgumentError, /cache_strategy must be a Symbol, String, or Proc/)
     end
 
-    it "supports deprecated head_rendering! method" do
-      component_class.send(:head_rendering!)
-      expect(component_class.head_rendering?).to be true
-    end
-
     describe ".stylesheet_link_options" do
       it "sets stylesheet link options" do
         options = {"data-turbo-track": "reload"}

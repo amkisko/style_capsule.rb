@@ -302,11 +302,6 @@ RSpec.describe StyleCapsule::ViewComponent do
       }.to raise_error(ArgumentError, /cache_strategy must be/)
     end
 
-    it "supports deprecated head_rendering! method" do
-      component_class.send(:head_rendering!)
-      expect(component_class.head_rendering?).to be true
-    end
-
     it "accepts proc as cache_strategy" do
       cache_proc = ->(css, capsule_id, namespace) {
         ["key_#{capsule_id}", css.length > 50, Time.current + 1800]

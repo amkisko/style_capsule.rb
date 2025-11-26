@@ -179,10 +179,6 @@ module StyleCapsule
       StyleCapsule::StylesheetRegistry.render_head_stylesheets(self, namespace: namespace)
     end
 
-    # @deprecated Use {#stylesheet_registry_tags} instead.
-    #   This method name will be removed in a future version.
-    alias_method :stylesheet_registrymap_tags, :stylesheet_registry_tags
-
     private
 
     # Escape HTML attribute value

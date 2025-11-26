@@ -121,19 +121,19 @@ RSpec.describe StyleCapsule::ViewComponentHelper do
     end
   end
 
-  describe "#stylesheet_registrymap_tags" do
+  describe "#stylesheet_registry_tags" do
     it "calls render_head_stylesheets with helpers" do
       helper.register_stylesheet("stylesheets/my_component")
       view_context = helper.helpers
       expect(StyleCapsule::StylesheetRegistry).to receive(:render_head_stylesheets)
         .with(view_context, namespace: nil)
         .and_return('<link rel="stylesheet">')
-      helper.stylesheet_registrymap_tags
+      helper.stylesheet_registry_tags
     end
 
     it "renders registered stylesheets and clears registry" do
       helper.register_stylesheet("stylesheets/my_component")
-      helper.stylesheet_registrymap_tags
+      helper.stylesheet_registry_tags
       # File registrations persist in manifest (process-wide), so any? returns true
       expect(StyleCapsule::StylesheetRegistry.any?).to be true
       # But inline CSS should be cleared (request-scoped)
@@ -143,7 +143,7 @@ RSpec.describe StyleCapsule::ViewComponentHelper do
     it "renders specific namespace" do
       helper.register_stylesheet("stylesheets/admin", namespace: :admin)
       helper.register_stylesheet("stylesheets/user", namespace: :user)
-      helper.stylesheet_registrymap_tags(namespace: :admin)
+      helper.stylesheet_registry_tags(namespace: :admin)
       # File registrations persist in manifest (process-wide)
       expect(StyleCapsule::StylesheetRegistry.any?(namespace: :user)).to be true # User namespace should remain
       expect(StyleCapsule::StylesheetRegistry.any?(namespace: :admin)).to be true # Admin should remain (manifest persists)
@@ -155,7 +155,17 @@ RSpec.describe StyleCapsule::ViewComponentHelper do
       expect(StyleCapsule::StylesheetRegistry).to receive(:render_head_stylesheets)
         .with(view_context, namespace: :admin)
         .and_return('<link rel="stylesheet">')
-      helper.stylesheet_registrymap_tags(namespace: :admin)
+      helper.stylesheet_registry_tags(namespace: :admin)
+    end
+
+    it "calls render_head_stylesheets with helpers as view_context" do
+      helper.register_stylesheet("stylesheets/my_component")
+      view_context = helper.helpers
+      expect(StyleCapsule::StylesheetRegistry).to receive(:render_head_stylesheets)
+        .with(view_context, namespace: nil)
+        .and_return('<link rel="stylesheet">')
+      result = helper.stylesheet_registry_tags
+      expect(result).to eq('<link rel="stylesheet">')
     end
   end
 end

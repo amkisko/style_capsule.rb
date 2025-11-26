@@ -176,14 +176,14 @@ RSpec.describe StyleCapsule::Helper do
     end
   end
 
-  describe "#stylesheet_registrymap_tags" do
+  describe "#stylesheet_registry_tags" do
     before do
       StyleCapsule::StylesheetRegistry.clear
     end
 
     it "renders registered stylesheets" do
       helper.register_stylesheet("stylesheets/my_component")
-      result = helper.stylesheet_registrymap_tags
+      result = helper.stylesheet_registry_tags
       expect(result).to be_a(String)
       # File registrations persist in manifest (process-wide), so any? returns true
       expect(StyleCapsule::StylesheetRegistry.any?).to be true
@@ -194,15 +194,23 @@ RSpec.describe StyleCapsule::Helper do
     it "renders specific namespace" do
       helper.register_stylesheet("stylesheets/admin", namespace: :admin)
       helper.register_stylesheet("stylesheets/user", namespace: :user)
-      result = helper.stylesheet_registrymap_tags(namespace: :admin)
+      result = helper.stylesheet_registry_tags(namespace: :admin)
       expect(result).to be_a(String)
       expect(StyleCapsule::StylesheetRegistry.any?(namespace: :user)).to be true # User namespace should remain
     end
 
     it "handles empty namespace string" do
       helper.register_stylesheet("stylesheets/test", namespace: "")
-      result = helper.stylesheet_registrymap_tags(namespace: "")
+      result = helper.stylesheet_registry_tags(namespace: "")
       expect(result).to be_a(String)
+    end
+
+    it "calls render_head_stylesheets with self as view_context" do
+      helper.register_stylesheet("stylesheets/my_component")
+      expect(StyleCapsule::StylesheetRegistry).to receive(:render_head_stylesheets)
+        .with(helper, namespace: nil)
+        .and_return('<link rel="stylesheet">')
+      helper.stylesheet_registry_tags
     end
   end
 

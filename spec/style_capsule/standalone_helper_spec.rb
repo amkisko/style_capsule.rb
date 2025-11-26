@@ -251,7 +251,7 @@ RSpec.describe StyleCapsule::StandaloneHelper do
     end
   end
 
-  describe "#stylesheet_registrymap_tags" do
+  describe "#stylesheet_registry_tags" do
     before do
       StyleCapsule::StylesheetRegistry.clear
       StyleCapsule::StylesheetRegistry.clear_manifest
@@ -259,7 +259,7 @@ RSpec.describe StyleCapsule::StandaloneHelper do
 
     it "renders registered stylesheets" do
       helper.register_stylesheet("stylesheets/main")
-      result = helper.stylesheet_registrymap_tags
+      result = helper.stylesheet_registry_tags
 
       expect(result).to be_a(String)
       expect(result).to include("stylesheet")
@@ -267,14 +267,23 @@ RSpec.describe StyleCapsule::StandaloneHelper do
 
     it "renders stylesheets for specific namespace" do
       helper.register_stylesheet("stylesheets/admin", namespace: :admin)
-      result = helper.stylesheet_registrymap_tags(namespace: :admin)
+      result = helper.stylesheet_registry_tags(namespace: :admin)
 
       expect(result).to be_a(String)
     end
 
     it "returns empty string when no stylesheets registered" do
-      result = helper.stylesheet_registrymap_tags
+      result = helper.stylesheet_registry_tags
       expect(result).to eq("")
+    end
+
+    it "calls render_head_stylesheets with self as view_context" do
+      helper.register_stylesheet("stylesheets/main")
+      expect(StyleCapsule::StylesheetRegistry).to receive(:render_head_stylesheets)
+        .with(helper, namespace: nil)
+        .and_return('<link rel="stylesheet">')
+      result = helper.stylesheet_registry_tags
+      expect(result).to eq('<link rel="stylesheet">')
     end
   end
 

@@ -29,7 +29,7 @@
 - Rails integration remains fully supported via Railtie
 - Added `StyleCapsule::StandaloneHelper` for non-Rails frameworks
 - `StylesheetRegistry` now works without `ActiveSupport::CurrentAttributes` using thread-local storage fallback
-- Renamed `stylesheet_registrymap_tags` to `stylesheet_registry_tags` (old name kept as deprecated alias)
+- Renamed `stylesheet_registrymap_tags` to `stylesheet_registry_tags` (deprecated alias removed in 1.4.0)
 - Extracted CSS building logic from Rake tasks into `StyleCapsule::ComponentBuilder`
 - Fixed XSS vulnerability in `escape_html_attr` by using `CGI.escapeHTML` for proper HTML entity escaping
 - Optimized ActiveSupport require to avoid exception handling overhead in Rails apps

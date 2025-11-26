@@ -264,7 +264,7 @@ RSpec.describe "StyleCapsule ViewComponent Integration", type: :integration do
       component = component_class.new(view_context: view_context)
       component.call
 
-      output = component.stylesheet_registrymap_tags
+      output = component.stylesheet_registry_tags
 
       expect(output).to be_a(String)
       expect(output).to include("stylesheet")

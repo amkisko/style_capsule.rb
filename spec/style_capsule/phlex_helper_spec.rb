@@ -121,19 +121,19 @@ RSpec.describe StyleCapsule::PhlexHelper do
     end
   end
 
-  describe "#stylesheet_registrymap_tags" do
+  describe "#stylesheet_registry_tags" do
     it "calls render_head_stylesheets with view_context" do
       helper.register_stylesheet("stylesheets/my_component")
       view_context = helper.view_context
       expect(StyleCapsule::StylesheetRegistry).to receive(:render_head_stylesheets)
         .with(view_context, namespace: nil)
         .and_return('<link rel="stylesheet">')
-      helper.stylesheet_registrymap_tags
+      helper.stylesheet_registry_tags
     end
 
     it "renders registered stylesheets and clears registry" do
       helper.register_stylesheet("stylesheets/my_component")
-      helper.stylesheet_registrymap_tags
+      helper.stylesheet_registry_tags
       # File registrations persist in manifest (process-wide), so any? returns true
       expect(StyleCapsule::StylesheetRegistry.any?).to be true
       # But inline CSS should be cleared (request-scoped)
@@ -143,7 +143,7 @@ RSpec.describe StyleCapsule::PhlexHelper do
     it "renders specific namespace" do
       helper.register_stylesheet("stylesheets/admin", namespace: :admin)
       helper.register_stylesheet("stylesheets/user", namespace: :user)
-      helper.stylesheet_registrymap_tags(namespace: :admin)
+      helper.stylesheet_registry_tags(namespace: :admin)
       # File registrations persist in manifest (process-wide)
       expect(StyleCapsule::StylesheetRegistry.any?(namespace: :user)).to be true # User namespace should remain
       expect(StyleCapsule::StylesheetRegistry.any?(namespace: :admin)).to be true # Admin should remain (manifest persists)
@@ -155,7 +155,7 @@ RSpec.describe StyleCapsule::PhlexHelper do
       expect(StyleCapsule::StylesheetRegistry).to receive(:render_head_stylesheets)
         .with(view_context, namespace: :admin)
         .and_return('<link rel="stylesheet">')
-      helper.stylesheet_registrymap_tags(namespace: :admin)
+      helper.stylesheet_registry_tags(namespace: :admin)
     end
 
     it "uses safe() method when available (Phlex component)" do
@@ -181,8 +181,52 @@ RSpec.describe StyleCapsule::PhlexHelper do
       helper_with_safe.view_context_double = view_context_double
       helper_with_safe.register_stylesheet("stylesheets/test")
 
-      result = helper_with_safe.stylesheet_registrymap_tags
+      # Spy on safe() and raw() to verify they're called
+      allow(helper_with_safe).to receive(:safe).and_call_original
+      allow(helper_with_safe).to receive(:raw).and_call_original
+
+      result = helper_with_safe.stylesheet_registry_tags
       expect(result).to be_a(String)
+      # Verify safe() and raw() were called (they're used for rendering, not return value)
+      expect(helper_with_safe).to have_received(:safe)
+      expect(helper_with_safe).to have_received(:raw)
+    end
+
+    it "returns output string when safe() method is not available" do
+      helper_class_without_safe = Class.new do
+        include StyleCapsule::PhlexHelper
+
+        attr_accessor :view_context_double
+
+        def view_context
+          @view_context_double
+        end
+
+        def raw(content)
+          content
+        end
+      end
+
+      helper_without_safe = helper_class_without_safe.new
+      helper_without_safe.view_context_double = view_context_double
+      helper_without_safe.register_stylesheet("stylesheets/test")
+
+      result = helper_without_safe.stylesheet_registry_tags
+      expect(result).to be_a(String)
+      # Should return the output string even without safe() method
+      expect(result).not_to be_empty
+    end
+
+    it "converts output to string and returns it" do
+      helper.register_stylesheet("stylesheets/my_component")
+      # Mock render_head_stylesheets to return a SafeBuffer-like object
+      safe_buffer = double("SafeBuffer", to_s: '<link rel="stylesheet">')
+      allow(StyleCapsule::StylesheetRegistry).to receive(:render_head_stylesheets)
+        .and_return(safe_buffer)
+
+      result = helper.stylesheet_registry_tags
+      expect(result).to eq('<link rel="stylesheet">')
+      expect(safe_buffer).to have_received(:to_s)
     end
   end
 end

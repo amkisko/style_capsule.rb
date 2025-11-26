@@ -191,7 +191,7 @@ RSpec.describe "StyleCapsule Phlex Integration", type: :integration do
       component.view_context = view_context_double
       component.call
 
-      output = component.stylesheet_registrymap_tags
+      output = component.stylesheet_registry_tags
 
       expect(output).to be_a(String)
     end

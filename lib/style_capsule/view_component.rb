@@ -227,12 +227,6 @@ module StyleCapsule
         end
       end
 
-      # Deprecated: Use stylesheet_registry instead
-      # @deprecated Use {#stylesheet_registry} instead
-      def head_rendering!
-        stylesheet_registry
-      end
-
       # Check if component uses head rendering
       def head_rendering?
         return false unless defined?(@head_rendering)

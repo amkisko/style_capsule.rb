@@ -43,7 +43,7 @@ module StyleCapsule
       def capsule_id: () -> String | nil
       def capsule_id: (String capsule_id) -> String
       def stylesheet_registry: (?namespace: Symbol | String | nil, ?cache_strategy: Symbol, ?cache_ttl: Integer | ActiveSupport::Duration | nil, ?cache_proc: Proc | nil) -> void
-      def head_rendering!: () -> void  # deprecated
+      def style_capsule: (?namespace: Symbol | String | nil, ?cache_strategy: Symbol | String | Proc | nil, ?cache_ttl: Integer | ActiveSupport::Duration | nil, ?cache_proc: Proc | nil, ?css_scoping_strategy: Symbol | nil, ?head_rendering: bool | nil) -> void
       def head_rendering?: () -> bool
       def stylesheet_namespace: () -> Symbol | String | nil
       def custom_capsule_id: () -> String | nil
@@ -68,7 +68,7 @@ module StyleCapsule
       def capsule_id: () -> String | nil
       def capsule_id: (String capsule_id) -> String
       def stylesheet_registry: (?namespace: Symbol | String | nil, ?cache_strategy: Symbol, ?cache_ttl: Integer | ActiveSupport::Duration | nil, ?cache_proc: Proc | nil) -> void
-      def head_rendering!: () -> void  # deprecated
+      def style_capsule: (?namespace: Symbol | String | nil, ?cache_strategy: Symbol | String | Proc | nil, ?cache_ttl: Integer | ActiveSupport::Duration | nil, ?cache_proc: Proc | nil, ?css_scoping_strategy: Symbol | nil, ?head_rendering: bool | nil) -> void
       def head_rendering?: () -> bool
       def stylesheet_namespace: () -> Symbol | String | nil
       def custom_capsule_id: () -> String | nil
@@ -89,7 +89,6 @@ module StyleCapsule
   module ViewComponentHelper
     def register_stylesheet: (String file_path, ?namespace: Symbol | String | nil, **Hash[untyped, untyped] options) -> void
     def stylesheet_registry_tags: (?namespace: Symbol | String | nil) -> String
-    def stylesheet_registrymap_tags: (?namespace: Symbol | String | nil) -> String  # deprecated
   end
 
   module Helper
@@ -98,13 +97,11 @@ module StyleCapsule
     def style_capsule: (?String css_content, ?capsule_id: String | nil) { () -> String } -> String
     def register_stylesheet: (String file_path, ?namespace: Symbol | String | nil, **Hash[untyped, untyped] options) -> void
     def stylesheet_registry_tags: (?namespace: Symbol | String | nil) -> String
-    def stylesheet_registrymap_tags: (?namespace: Symbol | String | nil) -> String  # deprecated
   end
 
   module PhlexHelper
     def register_stylesheet: (String file_path, ?namespace: Symbol | String | nil, **Hash[untyped, untyped] options) -> void
     def stylesheet_registry_tags: (?namespace: Symbol | String | nil) -> void
-    def stylesheet_registrymap_tags: (?namespace: Symbol | String | nil) -> void  # deprecated
   end
 
   class Railtie < Rails::Railtie

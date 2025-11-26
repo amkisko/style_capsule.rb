@@ -10,7 +10,7 @@ module StyleCapsule
   #
   # Usage in Phlex layouts:
   #   head do
-  #     stylesheet_registrymap_tags
+  #     stylesheet_registry_tags
   #   end
   #
   # Usage in Phlex components:
@@ -74,9 +74,5 @@ module StyleCapsule
       # Always return the output string for testing/compatibility
       output_string
     end
-
-    # @deprecated Use {#stylesheet_registry_tags} instead.
-    #   This method name will be removed in a future version.
-    alias_method :stylesheet_registrymap_tags, :stylesheet_registry_tags
   end
 end
