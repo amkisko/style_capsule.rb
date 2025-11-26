@@ -89,6 +89,7 @@ end
 #   # Or manually: bin/rails style_capsule:build
 module StyleCapsule
   require_relative "style_capsule/version"
+  require_relative "style_capsule/instrumentation"
   require_relative "style_capsule/css_processor"
   require_relative "style_capsule/css_file_writer"
   require_relative "style_capsule/stylesheet_registry"

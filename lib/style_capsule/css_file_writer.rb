@@ -2,6 +2,7 @@
 
 require "fileutils"
 require "digest/sha1"
+require_relative "instrumentation"
 
 module StyleCapsule
   # Writes inline CSS to files for HTTP caching
@@ -10,10 +11,28 @@ module StyleCapsule
   # Files are written to a configurable output directory and can be precompiled
   # via Rails asset pipeline.
   #
+  # In production environments where the app directory is read-only (e.g., Docker containers),
+  # this class automatically falls back to writing files to /tmp/style_capsule when the
+  # default location is not writable. When using the fallback directory, write_css returns
+  # nil, causing StylesheetRegistry to fall back to inline CSS (keeping the UI functional).
+  #
+  # All fallback scenarios are instrumented via ActiveSupport::Notifications following
+  # Rails conventions (https://guides.rubyonrails.org/active_support_instrumentation.html):
+  # - style_capsule.css_file_writer.fallback: When fallback directory is used successfully
+  # - style_capsule.css_file_writer.fallback_failure: When both primary and fallback fail
+  # - style_capsule.css_file_writer.write_failure: When other write errors occur
+  #
+  # All events include exception information in the standard Rails format:
+  # - :exception: Array of [class_name, message]
+  # - :exception_object: The exception object itself
+  #
+  # These events can be subscribed to for monitoring, metrics collection, and error reporting.
+  #
   # @example Configuration
   #   StyleCapsule::CssFileWriter.configure(
   #     output_dir: Rails.root.join(StyleCapsule::CssFileWriter::DEFAULT_OUTPUT_DIR),
-  #     filename_pattern: ->(component_class, capsule_id) { "capsule-#{capsule_id}.css" }
+  #     filename_pattern: ->(component_class, capsule_id) { "capsule-#{capsule_id}.css" },
+  #     fallback_dir: "/tmp/style_capsule"  # Optional, defaults to /tmp/style_capsule
   #   )
   #
   # @example Usage
@@ -22,13 +41,43 @@ module StyleCapsule
   #     component_class: MyComponent,
   #     capsule_id: "abc123"
   #   )
-  #   # => "capsules/capsule-abc123"
+  #   # => "capsules/capsule-abc123" (or nil if fallback was used)
+  #
+  # @example Listening to instrumentation events for monitoring
+  #   ActiveSupport::Notifications.subscribe("style_capsule.css_file_writer.fallback") do |name, start, finish, id, payload|
+  #     Rails.logger.warn "StyleCapsule fallback: #{payload[:component_class]} -> #{payload[:fallback_path]}"
+  #     # Exception info available: payload[:exception] and payload[:exception_object]
+  #   end
+  #
+  # @example Subscribing for error reporting
+  #   ActiveSupport::Notifications.subscribe("style_capsule.css_file_writer.fallback_failure") do |name, start, finish, id, payload|
+  #     ActionReporter.notify(
+  #       "StyleCapsule: CSS write failure (both primary and fallback failed)",
+  #       context: {
+  #         component_class: payload[:component_class],
+  #         original_path: payload[:original_path],
+  #         fallback_path: payload[:fallback_path],
+  #         original_exception: payload[:original_exception],
+  #         fallback_exception: payload[:fallback_exception]
+  #       }
+  #     )
+  #   end
+  #
+  # @example Subscribing for metrics collection
+  #   ActiveSupport::Notifications.subscribe("style_capsule.css_file_writer.fallback") do |name, start, finish, id, payload|
+  #     StatsD.increment("style_capsule.css_file_writer.fallback", tags: [
+  #       "component:#{payload[:component_class]}",
+  #       "error:#{payload[:exception].first}"
+  #     ])
+  #   end
   class CssFileWriter
     # Default output directory for CSS files (relative to Rails root)
     DEFAULT_OUTPUT_DIR = "app/assets/builds/capsules"
+    # Fallback directory for when default location is read-only (absolute path)
+    FALLBACK_OUTPUT_DIR = "/tmp/style_capsule"
 
     class << self
-      attr_accessor :output_dir, :filename_pattern, :enabled
+      attr_accessor :output_dir, :filename_pattern, :enabled, :fallback_dir
 
       # Configure CSS file writer
       #
@@ -38,6 +87,8 @@ module StyleCapsule
       #   Receives: (component_class, capsule_id) and should return filename string
       #   Default: `"capsule-#{capsule_id}.css"` (capsule_id is unique and deterministic)
       # @param enabled [Boolean] Whether file writing is enabled (default: true)
+      # @param fallback_dir [String, Pathname, nil] Fallback directory when default location is read-only
+      #   Default: `StyleCapsule::CssFileWriter::FALLBACK_OUTPUT_DIR` (/tmp/style_capsule)
       # @example
       #   StyleCapsule::CssFileWriter.configure(
       #     output_dir: Rails.root.join(StyleCapsule::CssFileWriter::DEFAULT_OUTPUT_DIR),
@@ -47,7 +98,7 @@ module StyleCapsule
       #   StyleCapsule::CssFileWriter.configure(
       #     filename_pattern: ->(klass, capsule) { "#{klass.name.underscore}-#{capsule}.css" }
       #   )
-      def configure(output_dir: nil, filename_pattern: nil, enabled: true)
+      def configure(output_dir: nil, filename_pattern: nil, enabled: true, fallback_dir: nil)
         @enabled = enabled
 
         @output_dir = if output_dir
@@ -58,6 +109,12 @@ module StyleCapsule
           Pathname.new(DEFAULT_OUTPUT_DIR)
         end
 
+        @fallback_dir = if fallback_dir
+          fallback_dir.is_a?(Pathname) ? fallback_dir : Pathname.new(fallback_dir.to_s)
+        else
+          Pathname.new(FALLBACK_OUTPUT_DIR)
+        end
+
         @filename_pattern = filename_pattern || default_filename_pattern
       end
 
@@ -66,17 +123,73 @@ module StyleCapsule
       # @param css_content [String] CSS content to write
       # @param component_class [Class] Component class that generated the CSS
       # @param capsule_id [String] Capsule ID for the component
-      # @return [String, nil] Relative file path (for stylesheet_link_tag) or nil if disabled
+      # @return [String, nil] Relative file path (for stylesheet_link_tag) or nil if disabled/failed
       def write_css(css_content:, component_class:, capsule_id:)
         return nil unless enabled?
 
-        ensure_output_directory
-
         filename = generate_filename(component_class, capsule_id)
         file_path = output_directory.join(filename)
+        used_fallback = false
 
-        # Write CSS to file with explicit UTF-8 encoding
-        File.write(file_path, css_content, encoding: "UTF-8")
+        begin
+          ensure_output_directory
+          # Write CSS to file with explicit UTF-8 encoding
+          Instrumentation.instrument_file_write(
+            component_class: component_class,
+            capsule_id: capsule_id,
+            file_path: file_path.to_s,
+            size: css_content.bytesize
+          ) do
+            File.write(file_path, css_content, encoding: "UTF-8")
+          end
+        rescue Errno::EACCES, Errno::EROFS => e
+          # Permission denied or read-only filesystem - try fallback directory
+          fallback_path = fallback_directory.join(filename)
+
+          begin
+            ensure_fallback_directory
+            File.write(fallback_path, css_content, encoding: "UTF-8")
+            used_fallback = true
+            file_path = fallback_path
+
+            # Instrument the fallback for visibility
+            Instrumentation.instrument_fallback(
+              component_class: component_class,
+              capsule_id: capsule_id,
+              original_path: output_directory.join(filename).to_s,
+              fallback_path: fallback_path.to_s,
+              exception: [e.class.name, e.message],
+              exception_object: e
+            )
+          rescue => fallback_error
+            # Even fallback failed - instrument and return nil (will fall back to inline CSS)
+            Instrumentation.instrument_fallback_failure(
+              component_class: component_class,
+              capsule_id: capsule_id,
+              original_path: output_directory.join(filename).to_s,
+              fallback_path: fallback_path.to_s,
+              original_exception: [e.class.name, e.message],
+              original_exception_object: e,
+              fallback_exception: [fallback_error.class.name, fallback_error.message],
+              fallback_exception_object: fallback_error
+            )
+            return nil
+          end
+        rescue => e
+          # Other errors - instrument and return nil (will fall back to inline CSS)
+          Instrumentation.instrument_write_failure(
+            component_class: component_class,
+            capsule_id: capsule_id,
+            file_path: file_path.to_s,
+            exception: [e.class.name, e.message],
+            exception_object: e
+          )
+          return nil
+        end
+
+        # If we used fallback directory, return nil (can't serve via asset pipeline)
+        # This will cause StylesheetRegistry to fall back to inline CSS
+        return nil if used_fallback
 
         # Return relative path for stylesheet_link_tag
         # Path should be relative to app/assets
@@ -135,6 +248,16 @@ module StyleCapsule
         FileUtils.mkdir_p(dir) unless Dir.exist?(dir)
       end
 
+      # Ensure fallback directory exists
+      #
+      # @return [void]
+      def ensure_fallback_directory
+        return unless enabled?
+
+        dir = fallback_directory
+        FileUtils.mkdir_p(dir) unless Dir.exist?(dir)
+      end
+
       # Clear all generated CSS files
       #
       # @return [void]
@@ -169,6 +292,11 @@ module StyleCapsule
         else
           Pathname.new(DEFAULT_OUTPUT_DIR)
         end
+      end
+
+      # Get fallback directory (with default)
+      def fallback_directory
+        @fallback_dir ||= Pathname.new(FALLBACK_OUTPUT_DIR)
       end
 
       # Generate filename using pattern

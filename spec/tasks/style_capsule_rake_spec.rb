@@ -97,6 +97,16 @@ RSpec.describe "style_capsule rake tasks" do
   end
 
   describe "style_capsule:build" do
+    it "requires component_builder module when task is invoked" do
+      # The require happens when the task is invoked, not when it's defined
+      # So we just verify the task can be invoked (which triggers the require)
+      output = StringIO.new
+      allow($stdout).to receive(:puts) { |msg| output.puts(msg) }
+
+      Rake::Task["style_capsule:build"].reenable
+      expect { Rake::Task["style_capsule:build"].invoke }.not_to raise_error
+    end
+
     context "with Phlex components" do
       before do
         skip "Phlex not available" unless defined?(Phlex::HTML)
@@ -372,6 +382,27 @@ RSpec.describe "style_capsule rake tasks" do
   end
 
   describe "style_capsule:clear" do
+    it "executes all lines in clear task including require, clear_files, and puts" do
+      # Create a test file to ensure clear_files has something to do
+      test_file = test_output_dir.join("test-component-abc123.css")
+      FileUtils.mkdir_p(test_output_dir)
+      File.write(test_file, ".test { color: red; }")
+
+      expect(File.exist?(test_file)).to be true
+
+      # Capture output to verify puts is called (line 15)
+      output = StringIO.new
+      allow($stdout).to receive(:puts) { |msg| output.puts(msg) }
+
+      # Invoke clear task - this should execute lines 13 (require), 14 (clear_files), 15 (puts)
+      Rake::Task["style_capsule:clear"].reenable
+      Rake::Task["style_capsule:clear"].invoke
+
+      # Verify the task executed (file was cleared and puts was called)
+      expect(File.exist?(test_file)).to be false
+      expect(output.string).to include("StyleCapsule CSS files cleared")
+    end
+
     it "removes generated CSS files" do
       # Create a test file
       test_file = test_output_dir.join("test-component-abc123.css")
@@ -380,21 +411,33 @@ RSpec.describe "style_capsule rake tasks" do
 
       expect(File.exist?(test_file)).to be true
 
+      # Capture output to verify puts is called
+      output = StringIO.new
+      allow($stdout).to receive(:puts) { |msg| output.puts(msg) }
+
       # Invoke clear task (reenable in case it was cleared)
       Rake::Task["style_capsule:clear"].reenable
       Rake::Task["style_capsule:clear"].invoke
 
       # Verify file was removed
       expect(File.exist?(test_file)).to be false
+      # Verify puts was called with the success message
+      expect(output.string).to include("StyleCapsule CSS files cleared")
     end
 
     it "handles empty directory gracefully" do
       # Ensure directory exists but is empty
       FileUtils.mkdir_p(test_output_dir)
 
+      # Capture output
+      output = StringIO.new
+      allow($stdout).to receive(:puts) { |msg| output.puts(msg) }
+
       # Should not raise an error
       Rake::Task["style_capsule:clear"].reenable
       expect { Rake::Task["style_capsule:clear"].invoke }.not_to raise_error
+      # Verify puts was called
+      expect(output.string).to include("StyleCapsule CSS files cleared")
     end
   end
 

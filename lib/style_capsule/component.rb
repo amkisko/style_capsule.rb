@@ -463,9 +463,9 @@ module StyleCapsule
       # Use the configured scoping strategy
       scoped_css = case scoping_strategy
       when :nesting
-        CssProcessor.scope_with_nesting(css_content, capsule_id)
+        CssProcessor.scope_with_nesting(css_content, capsule_id, component_class: self.class)
       else # :selector_patching (default)
-        CssProcessor.scope_selectors(css_content, capsule_id)
+        CssProcessor.scope_selectors(css_content, capsule_id, component_class: self.class)
       end
 
       # Cache at class level (one style block per component type/scope/strategy combination)

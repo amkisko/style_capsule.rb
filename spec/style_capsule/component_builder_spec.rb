@@ -71,6 +71,30 @@ RSpec.describe StyleCapsule::ComponentBuilder do
         end
       end
 
+      it "handles errors gracefully when checking class inheritance" do
+        # Create a class that will raise an error when checking inheritance
+        klass_name = "ErrorPhlexComponent_#{SecureRandom.hex(4)}"
+        error_class = Class.new do
+          def self.<(other)
+            raise StandardError, "Inheritance check failed"
+          end
+        end
+
+        Object.const_set(klass_name, error_class)
+        StyleCapsule::ClassRegistry.register(error_class)
+
+        begin
+          # Should not raise an error, should skip the problematic class
+          expect {
+            components = described_class.find_phlex_components
+            expect(components).not_to include(error_class)
+          }.not_to raise_error
+        ensure
+          Object.send(:remove_const, klass_name) if Object.const_defined?(klass_name)
+          StyleCapsule::ClassRegistry.clear
+        end
+      end
+
       it "does not find Phlex components without StyleCapsule::Component" do
         # Create a named class that doesn't include StyleCapsule::Component
         klass_name = "TestPhlexComponentNoStyle_#{SecureRandom.hex(4)}"
@@ -132,30 +156,29 @@ RSpec.describe StyleCapsule::ComponentBuilder do
       end
 
       it "handles errors in ClassRegistry.each gracefully" do
-        # Create a class that will cause an error when checking inheritance
-        error_class = Class.new(ViewComponent::Base) do
-          include StyleCapsule::ViewComponent
-
+        # Create a class that will raise an error when checking inheritance
+        error_class = Class.new do
           def self.<(other)
             raise StandardError, "Inheritance check error"
           end
         end
 
-        # Register it manually
         StyleCapsule::ClassRegistry.register(error_class)
 
-        # Should not raise an error
-        expect {
-          components = described_class.find_view_components
-          expect(components).not_to include(error_class)
-        }.not_to raise_error
-
-        StyleCapsule::ClassRegistry.clear
+        begin
+          # Should not raise an error, should skip the problematic class
+          expect {
+            components = described_class.find_view_components
+            expect(components).not_to include(error_class)
+          }.not_to raise_error
+        ensure
+          StyleCapsule::ClassRegistry.clear
+        end
       end
 
-      it "handles outer rescue block when ViewComponent has loading issues" do
-        # Mock ClassRegistry.each to raise an error
-        allow(StyleCapsule::ClassRegistry).to receive(:each).and_raise(StandardError, "ViewComponent loading error")
+      it "handles ViewComponent loading errors gracefully" do
+        # Stub ClassRegistry.each to raise an error
+        allow(StyleCapsule::ClassRegistry).to receive(:each).and_raise(StandardError, "ViewComponent error")
 
         # Should not raise an error, should return empty array
         expect {
@@ -163,10 +186,49 @@ RSpec.describe StyleCapsule::ComponentBuilder do
           expect(components).to eq([])
         }.not_to raise_error
       end
-    end
 
-    # ViewComponent tests removed - ViewComponent requires Rails to be fully initialized
-    # which is not available in the test environment
+      it "handles errors when checking class inheritance in ClassRegistry.each" do
+        # Create a class that will raise an error when checking inheritance
+        error_class = Class.new do
+          def self.<(other)
+            raise StandardError, "Inheritance check error"
+          end
+        end
+
+        StyleCapsule::ClassRegistry.register(error_class)
+
+        begin
+          # Should not raise an error, should skip the problematic class
+          expect {
+            components = described_class.find_view_components
+            expect(components).not_to include(error_class)
+          }.not_to raise_error
+        ensure
+          StyleCapsule::ClassRegistry.clear
+        end
+      end
+
+      it "handles errors when checking included_modules" do
+        # Create a class that will raise an error when checking included_modules
+        error_class = Class.new(ViewComponent::Base) do
+          def self.included_modules
+            raise StandardError, "included_modules error"
+          end
+        end
+
+        StyleCapsule::ClassRegistry.register(error_class)
+
+        begin
+          # Should not raise an error, should skip the problematic class
+          expect {
+            components = described_class.find_view_components
+            expect(components).not_to include(error_class)
+          }.not_to raise_error
+        ensure
+          StyleCapsule::ClassRegistry.clear
+        end
+      end
+    end
   end
 
   describe ".collect_components" do

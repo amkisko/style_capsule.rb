@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "instrumentation"
+
 module StyleCapsule
   # Shared CSS processing logic for scoping selectors with attribute selectors
   #
@@ -35,9 +37,10 @@ module StyleCapsule
     #
     # @param css_string [String] Original CSS content
     # @param capsule_id [String] The capsule ID to use in attribute selector
+    # @param component_class [Class, String, nil] Optional component class for instrumentation
     # @return [String] CSS with scoped selectors
     # @raise [ArgumentError] If CSS content exceeds maximum size or capsule_id is invalid
-    def self.scope_selectors(css_string, capsule_id)
+    def self.scope_selectors(css_string, capsule_id, component_class: nil)
       return css_string if css_string.nil? || css_string.strip.empty?
 
       # Validate CSS size to prevent DoS attacks
@@ -48,61 +51,69 @@ module StyleCapsule
       # Validate capsule_id
       validate_capsule_id!(capsule_id)
 
-      css = css_string.dup
-      capsule_attr = %([data-capsule="#{capsule_id}"])
+      # Instrument CSS processing with timing and size metrics
+      Instrumentation.instrument_css_processing(
+        strategy: :selector_patching,
+        component_class: component_class || "Unknown",
+        capsule_id: capsule_id,
+        css_content: css_string
+      ) do
+        css = css_string.dup
+        capsule_attr = %([data-capsule="#{capsule_id}"])
 
-      # Strip CSS comments to avoid interference with selector matching
-      # Simple approach: remove /* ... */ comments (including multi-line)
-      css_without_comments = strip_comments(css)
+        # Strip CSS comments to avoid interference with selector matching
+        # Simple approach: remove /* ... */ comments (including multi-line)
+        css_without_comments = strip_comments(css)
 
-      # Process CSS rule by rule
-      # Match: selector(s) { ... }
-      # Pattern: (start or closing brace) + (whitespace) + (selector text) + (opening brace)
-      # Note: Uses non-greedy quantifier ([^{}@]+?) to minimize backtracking
-      # MAX_CSS_SIZE limit (1MB) mitigates ReDoS risk from malicious input
-      css_without_comments.gsub!(/(^|\})(\s*)([^{}@]+?)(\{)/m) do |_|
-        prefix = Regexp.last_match(1)  # Previous closing brace or start
-        whitespace = Regexp.last_match(2)  # Whitespace between rules
-        selectors_raw = Regexp.last_match(3)  # The selector group
-        selectors = selectors_raw.strip  # Stripped for processing
-        opening_brace = Regexp.last_match(4)  # The opening brace
+        # Process CSS rule by rule
+        # Match: selector(s) { ... }
+        # Pattern: (start or closing brace) + (whitespace) + (selector text) + (opening brace)
+        # Note: Uses non-greedy quantifier ([^{}@]+?) to minimize backtracking
+        # MAX_CSS_SIZE limit (1MB) mitigates ReDoS risk from malicious input
+        css_without_comments.gsub!(/(^|\})(\s*)([^{}@]+?)(\{)/m) do |_|
+          prefix = Regexp.last_match(1)  # Previous closing brace or start
+          whitespace = Regexp.last_match(2)  # Whitespace between rules
+          selectors_raw = Regexp.last_match(3)  # The selector group
+          selectors = selectors_raw.strip  # Stripped for processing
+          opening_brace = Regexp.last_match(4)  # The opening brace
 
-        # Skip at-rules (@media, @keyframes, etc.) - they should not be scoped at top level
-        next "#{prefix}#{whitespace}#{selectors_raw}#{opening_brace}" if selectors.start_with?("@")
+          # Skip at-rules (@media, @keyframes, etc.) - they should not be scoped at top level
+          next "#{prefix}#{whitespace}#{selectors_raw}#{opening_brace}" if selectors.start_with?("@")
 
-        # Skip if already scoped (avoid double-scoping)
-        next "#{prefix}#{whitespace}#{selectors_raw}#{opening_brace}" if selectors_raw.include?("[data-capsule=")
+          # Skip if already scoped (avoid double-scoping)
+          next "#{prefix}#{whitespace}#{selectors_raw}#{opening_brace}" if selectors_raw.include?("[data-capsule=")
 
-        # Skip empty selectors
-        next "#{prefix}#{whitespace}#{selectors_raw}#{opening_brace}" if selectors.empty?
+          # Skip empty selectors
+          next "#{prefix}#{whitespace}#{selectors_raw}#{opening_brace}" if selectors.empty?
 
-        # Split selectors by comma and scope each one
-        scoped_selectors = selectors.split(",").map do |selector|
-          selector = selector.strip
-          next selector if selector.empty?
+          # Split selectors by comma and scope each one
+          scoped_selectors = selectors.split(",").map do |selector|
+            selector = selector.strip
+            next selector if selector.empty?
 
-          # Handle special component-scoped selectors (:host, :host-context)
-          if selector.start_with?(":host")
-            selector = selector
-              .gsub(/^:host-context\(([^)]+)\)/, "#{capsule_attr} \\1")
-              .gsub(/^:host\(([^)]+)\)/, "#{capsule_attr}\\1")
-              .gsub(/^:host\b/, capsule_attr)
-            selector
-          else
-            # Add capsule attribute with space before selector for descendant matching
-            # This ensures styles apply to elements inside the scoped wrapper
-            "#{capsule_attr} #{selector}"
-          end
-        end.compact.join(", ")
+            # Handle special component-scoped selectors (:host, :host-context)
+            if selector.start_with?(":host")
+              selector = selector
+                .gsub(/^:host-context\(([^)]+)\)/, "#{capsule_attr} \\1")
+                .gsub(/^:host\(([^)]+)\)/, "#{capsule_attr}\\1")
+                .gsub(/^:host\b/, capsule_attr)
+              selector
+            else
+              # Add capsule attribute with space before selector for descendant matching
+              # This ensures styles apply to elements inside the scoped wrapper
+              "#{capsule_attr} #{selector}"
+            end
+          end.compact.join(", ")
 
-        "#{prefix}#{whitespace}#{scoped_selectors}#{opening_brace}"
+          "#{prefix}#{whitespace}#{scoped_selectors}#{opening_brace}"
+        end
+
+        # Restore comments in their original positions
+        # Since we stripped comments, we need to put them back
+        # For simplicity, we'll just return the processed CSS without comments
+        # (comments are typically removed in production CSS anyway)
+        css_without_comments
       end
-
-      # Restore comments in their original positions
-      # Since we stripped comments, we need to put them back
-      # For simplicity, we'll just return the processed CSS without comments
-      # (comments are typically removed in production CSS anyway)
-      css_without_comments
     end
 
     # Scope CSS using CSS nesting (wraps entire CSS in [data-capsule] { ... })
@@ -122,9 +133,10 @@ module StyleCapsule
     #
     # @param css_string [String] Original CSS content
     # @param capsule_id [String] The capsule ID to use in attribute selector
+    # @param component_class [Class, String, nil] Optional component class for instrumentation
     # @return [String] CSS wrapped in nesting selector
     # @raise [ArgumentError] If CSS content exceeds maximum size or capsule_id is invalid
-    def self.scope_with_nesting(css_string, capsule_id)
+    def self.scope_with_nesting(css_string, capsule_id, component_class: nil)
       return css_string if css_string.nil? || css_string.strip.empty?
 
       # Validate CSS size to prevent DoS attacks
@@ -135,10 +147,18 @@ module StyleCapsule
       # Validate capsule_id
       validate_capsule_id!(capsule_id)
 
-      # Simply wrap the entire CSS in the capsule attribute selector
-      # No parsing or transformation needed - much more performant
-      capsule_attr = %([data-capsule="#{capsule_id}"])
-      "#{capsule_attr} {\n#{css_string}\n}"
+      # Instrument CSS processing with timing and size metrics
+      Instrumentation.instrument_css_processing(
+        strategy: :nesting,
+        component_class: component_class || "Unknown",
+        capsule_id: capsule_id,
+        css_content: css_string
+      ) do
+        # Simply wrap the entire CSS in the capsule attribute selector
+        # No parsing or transformation needed - much more performant
+        capsule_attr = %([data-capsule="#{capsule_id}"])
+        "#{capsule_attr} {\n#{css_string}\n}"
+      end
     end
 
     # Strip CSS comments (/* ... */) from the string

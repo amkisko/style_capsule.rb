@@ -24,49 +24,70 @@ if defined?(StyleCapsule::Railtie)
         end
 
         it "adds output directory to asset paths when assets config exists" do
-          # Ensure assets config exists
-          unless Rails.application.config.respond_to?(:assets)
-            Rails.application.config.define_singleton_method(:assets) do
-              OpenStruct.new(paths: [])
-            end
-          end
+          # Use a temporary directory instead of project root to avoid creating directories in the repo
+          test_output_dir = Pathname.new(Dir.mktmpdir("style_capsule_railtie_test_"))
 
-          # Create the directory
-          capsules_dir = Rails.root.join(StyleCapsule::CssFileWriter::DEFAULT_OUTPUT_DIR)
-          FileUtils.mkdir_p(capsules_dir) unless Dir.exist?(capsules_dir)
+          # Configure CssFileWriter to use the test directory
+          original_output_dir = StyleCapsule::CssFileWriter.output_dir
+          StyleCapsule::CssFileWriter.configure(output_dir: test_output_dir)
 
           begin
+            # Ensure assets config exists
+            unless Rails.application.config.respond_to?(:assets)
+              Rails.application.config.define_singleton_method(:assets) do
+                OpenStruct.new(paths: [])
+              end
+            end
+
+            # Create the directory
+            FileUtils.mkdir_p(test_output_dir) unless Dir.exist?(test_output_dir)
+
             # Trigger the after_initialize callback
             StyleCapsule::Railtie.config.after_initialize.each(&:call) if StyleCapsule::Railtie.config.respond_to?(:after_initialize)
 
             # Verify the path was added
-            expect(Rails.application.config.assets.paths).to include(capsules_dir)
+            expect(Rails.application.config.assets.paths).to include(test_output_dir)
           ensure
             # Clean up
-            FileUtils.rm_rf(capsules_dir) if Dir.exist?(capsules_dir)
-            Rails.application.config.assets.paths.delete(capsules_dir)
+            FileUtils.rm_rf(test_output_dir) if Dir.exist?(test_output_dir)
+            Rails.application.config.assets.paths.delete(test_output_dir) if Rails.application.config.respond_to?(:assets)
+            # Restore original output directory
+            StyleCapsule::CssFileWriter.configure(output_dir: original_output_dir) if original_output_dir
           end
         end
 
         it "does not add output directory when it doesn't exist" do
-          # Ensure assets config exists
-          unless Rails.application.config.respond_to?(:assets)
-            Rails.application.config.define_singleton_method(:assets) do
-              OpenStruct.new(paths: [])
+          # Use a temporary directory instead of project root
+          test_output_dir = Pathname.new(Dir.mktmpdir("style_capsule_railtie_test_"))
+
+          # Configure CssFileWriter to use the test directory
+          original_output_dir = StyleCapsule::CssFileWriter.output_dir
+          StyleCapsule::CssFileWriter.configure(output_dir: test_output_dir)
+
+          begin
+            # Ensure assets config exists
+            unless Rails.application.config.respond_to?(:assets)
+              Rails.application.config.define_singleton_method(:assets) do
+                OpenStruct.new(paths: [])
+              end
             end
+
+            # Ensure directory doesn't exist
+            FileUtils.rm_rf(test_output_dir) if Dir.exist?(test_output_dir)
+
+            initial_paths_count = Rails.application.config.assets.paths.size
+
+            # Trigger the after_initialize callback
+            StyleCapsule::Railtie.config.after_initialize.each(&:call) if StyleCapsule::Railtie.config.respond_to?(:after_initialize)
+
+            # Verify the path was not added
+            expect(Rails.application.config.assets.paths.size).to eq(initial_paths_count)
+          ensure
+            # Clean up
+            FileUtils.rm_rf(test_output_dir) if Dir.exist?(test_output_dir)
+            # Restore original output directory
+            StyleCapsule::CssFileWriter.configure(output_dir: original_output_dir) if original_output_dir
           end
-
-          # Ensure directory doesn't exist
-          capsules_dir = Rails.root.join(StyleCapsule::CssFileWriter::DEFAULT_OUTPUT_DIR)
-          FileUtils.rm_rf(capsules_dir) if Dir.exist?(capsules_dir)
-
-          initial_paths_count = Rails.application.config.assets.paths.size
-
-          # Trigger the after_initialize callback
-          StyleCapsule::Railtie.config.after_initialize.each(&:call) if StyleCapsule::Railtie.config.respond_to?(:after_initialize)
-
-          # Verify the path was not added
-          expect(Rails.application.config.assets.paths.size).to eq(initial_paths_count)
         end
 
         it "handles missing assets config gracefully" do
