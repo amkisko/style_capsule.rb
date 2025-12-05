@@ -1,5 +1,6 @@
 require "simplecov"
 require "simplecov-cobertura"
+require "simplecov_json_formatter"
 
 SimpleCov.start do
   track_files "{lib,app}/**/*.rb"
@@ -7,7 +8,8 @@ SimpleCov.start do
   add_filter "/lib/style_capsule/version.rb"
   formatter SimpleCov::Formatter::MultiFormatter.new([
     SimpleCov::Formatter::HTMLFormatter,
-    SimpleCov::Formatter::CoberturaFormatter
+    SimpleCov::Formatter::CoberturaFormatter,
+    SimpleCov::Formatter::JSONFormatter
   ])
 end
 
