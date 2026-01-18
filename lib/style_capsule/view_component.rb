@@ -264,6 +264,7 @@ module StyleCapsule
       # @param cache_proc [Proc, nil] Custom cache proc (for :proc strategy)
       # @param scoping_strategy [Symbol, nil] CSS scoping strategy: :selector_patching (default) or :nesting
       # @param head_rendering [Boolean, nil] Enable head rendering (default: true if any option is set, false otherwise)
+      # @param tag [Symbol, String, nil] HTML tag name for wrapper element (default: :div)
       # @return [void]
       # @example Basic usage with namespace
       #   class AdminComponent < ApplicationComponent
@@ -296,7 +297,7 @@ module StyleCapsule
       #     # Can override specific settings:
       #     style_capsule namespace: :user  # Overrides namespace, keeps cache settings
       #   end
-      def style_capsule(namespace: nil, cache_strategy: nil, cache_ttl: nil, cache_proc: nil, scoping_strategy: nil, head_rendering: nil)
+      def style_capsule(namespace: nil, cache_strategy: nil, cache_ttl: nil, cache_proc: nil, scoping_strategy: nil, head_rendering: nil, tag: nil)
         # Set namespace (stored in instance variable, but getter checks parent class for inheritance)
         if namespace
           @stylesheet_namespace = namespace
@@ -317,6 +318,11 @@ module StyleCapsule
             raise ArgumentError, "scoping_strategy must be :selector_patching or :nesting (got: #{scoping_strategy.inspect})"
           end
           @css_scoping_strategy = scoping_strategy
+        end
+
+        # Configure wrapper tag if provided
+        if tag
+          @wrapper_tag = tag
         end
 
         # Enable head rendering if explicitly set or if any option is provided (except scoping_strategy)
@@ -382,6 +388,21 @@ module StyleCapsule
 
       public :css_scoping_strategy
 
+      # Get wrapper tag (checks instance variable, then parent class, defaults to :div)
+      #
+      # @return [Symbol, String] The wrapper tag (default: :div)
+      def wrapper_tag
+        if defined?(@wrapper_tag) && @wrapper_tag
+          @wrapper_tag
+        elsif superclass.respond_to?(:wrapper_tag, true)
+          superclass.wrapper_tag
+        else
+          :div
+        end
+      end
+
+      public :wrapper_tag
+
       # Set or get options for stylesheet_link_tag when using file-based caching
       #
       # @param options [Hash, nil] Options to pass to stylesheet_link_tag (e.g., "data-turbo-track": "reload", omit to get current value)
@@ -415,8 +436,11 @@ module StyleCapsule
           # Get content from original call method
           content_html = super
 
+          # Get wrapper tag
+          tag = self.class.wrapper_tag
+
           # Wrap content in scoped element
-          scoped_wrapper = helpers.content_tag(:div, content_html.html_safe, data: {capsule: component_capsule})
+          scoped_wrapper = helpers.content_tag(tag, content_html.html_safe, data: {capsule: component_capsule})
 
           # Combine styles and wrapped content
           (styles_html + scoped_wrapper).html_safe

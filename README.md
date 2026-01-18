@@ -88,6 +88,17 @@ end
 <% end %>
 ```
 
+**With custom wrapper tag:**
+
+```erb
+<%= style_capsule(tag: :section) do %>
+  <style>
+    .section { color: red; }
+  </style>
+  <div class="section">Content</div>
+<% end %>
+```
+
 ## CSS Scoping Strategies
 
 StyleCapsule supports two CSS scoping strategies:
@@ -109,6 +120,15 @@ StyleCapsule supports two CSS scoping strategies:
 class MyComponent < ApplicationComponent
   include StyleCapsule::Component
   style_capsule scoping_strategy: :nesting  # Use CSS nesting
+end
+```
+
+**With custom wrapper tag:**
+
+```ruby
+class MyComponent < ApplicationComponent
+  include StyleCapsule::Component
+  style_capsule tag: :section  # Use <section> instead of <div> for wrapper
 end
 ```
 

@@ -83,7 +83,13 @@ module StyleCapsule
     #   <%= style_capsule(css_content, capsule_id: "test-123") do %>
     #     <div class="section">Content</div>
     #   <% end %>
-    def style_capsule(css_content = nil, capsule_id: nil, &content_block)
+    #
+    # Or with tag option:
+    #   <%= style_capsule(tag: :section) do %>
+    #     <style>.section { color: red; }</style>
+    #     <div class="section">Content</div>
+    #   <% end %>
+    def style_capsule(css_content = nil, capsule_id: nil, tag: :div, &content_block)
       html_content = nil
 
       # If CSS content is provided as argument, use it
@@ -129,7 +135,7 @@ module StyleCapsule
 
       # Render style tag and wrapped content
       style_tag = content_tag(:style, raw(scoped_css), type: "text/css")
-      wrapped_content = content_tag(:div, raw(html_content), data: {capsule: capsule_id})
+      wrapped_content = content_tag(tag, raw(html_content), data: {capsule: capsule_id})
 
       (style_tag + wrapped_content).html_safe
     end
