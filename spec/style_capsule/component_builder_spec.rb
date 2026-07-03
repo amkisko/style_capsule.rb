@@ -56,8 +56,7 @@ RSpec.describe StyleCapsule::ComponentBuilder do
           end
         end
 
-        # Set constant first so class has a name
-        Object.const_set(klass_name, component_class)
+        stub_const(klass_name, component_class)
 
         begin
           # Now include the module - this will register the class
@@ -66,7 +65,6 @@ RSpec.describe StyleCapsule::ComponentBuilder do
           components = described_class.find_phlex_components
           expect(components).to include(component_class)
         ensure
-          Object.send(:remove_const, klass_name) if Object.const_defined?(klass_name)
           StyleCapsule::ClassRegistry.clear
         end
       end
@@ -80,7 +78,7 @@ RSpec.describe StyleCapsule::ComponentBuilder do
           end
         end
 
-        Object.const_set(klass_name, error_class)
+        stub_const(klass_name, error_class)
         StyleCapsule::ClassRegistry.register(error_class)
 
         begin
@@ -90,7 +88,6 @@ RSpec.describe StyleCapsule::ComponentBuilder do
             expect(components).not_to include(error_class)
           }.not_to raise_error
         ensure
-          Object.send(:remove_const, klass_name) if Object.const_defined?(klass_name)
           StyleCapsule::ClassRegistry.clear
         end
       end
@@ -104,15 +101,12 @@ RSpec.describe StyleCapsule::ComponentBuilder do
           end
         end
 
-        # Set constant so class has a name
-        Object.const_set(klass_name, component_class)
+        stub_const(klass_name, component_class)
 
         begin
           # Should not be found since it doesn't include StyleCapsule::Component
           components = described_class.find_phlex_components
           expect(components).not_to include(component_class)
-        ensure
-          Object.send(:remove_const, klass_name) if Object.const_defined?(klass_name)
         end
       end
 
@@ -229,11 +223,6 @@ RSpec.describe StyleCapsule::ComponentBuilder do
         end
       end
     end
-  end
-
-  describe ".collect_components" do
-    # ViewComponent test removed - ViewComponent requires Rails to be fully initialized
-    # which is not available in the test environment
   end
 
   describe ".build_component" do

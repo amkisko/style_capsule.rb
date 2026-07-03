@@ -60,7 +60,12 @@ RSpec/RepeatedExample:
   Enabled: false
 
 RSpec/DescribeClass:
-  Exclude: []
+  Exclude:
+    - spec/integration/**/*
+    - spec/tasks/**/*
+
+RSpec/MultipleExpectations:
+  Max: 7
 
 RSpec/VerifiedDoubles:
   Enabled: false
@@ -118,10 +123,15 @@ Metrics/ModuleLength:
   Enabled: true
   CountAsOne: [array, hash, heredoc, method_call]
   Max: 150
+  Exclude:
+    - lib/style_capsule/component_class_methods.rb
 Metrics/ClassLength:
   Enabled: true
   CountAsOne: [array, hash, heredoc, method_call]
   Max: 150
+  Exclude:
+    - lib/style_capsule/stylesheet_registry.rb
+    - lib/style_capsule/css_file_writer.rb
 Metrics/CyclomaticComplexity:
   Enabled: true
   Max: 10
@@ -132,3 +142,5 @@ Metrics/AbcSize:
   Enabled: true
   Max: 15
   CountRepeatedAttributes: false
+  Exclude:
+    - spec/support/**/*

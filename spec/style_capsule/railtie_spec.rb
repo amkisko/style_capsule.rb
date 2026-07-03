@@ -6,8 +6,8 @@ if defined?(StyleCapsule::Railtie)
   RSpec.describe StyleCapsule::Railtie do
     describe "Rails integration" do
       it "defines Railtie class" do
-        expect(StyleCapsule::Railtie).to be_a(Class)
-        expect(StyleCapsule::Railtie.superclass).to eq(Rails::Railtie)
+        expect(described_class).to be_a(Class)
+        expect(described_class.superclass).to eq(Rails::Railtie)
       end
 
       it "is a subclass of Rails::Railtie" do
@@ -22,7 +22,7 @@ if defined?(StyleCapsule::Railtie)
       describe "after_initialize callback" do
         it "configures CSS file writer with Rails root" do
           # Trigger the after_initialize callback
-          StyleCapsule::Railtie.config.after_initialize.each(&:call) if StyleCapsule::Railtie.config.respond_to?(:after_initialize)
+          described_class.config.after_initialize.each(&:call) if described_class.config.respond_to?(:after_initialize)
 
           # Verify CssFileWriter was configured
           expect(StyleCapsule::CssFileWriter.output_dir).to be_a(Pathname)
@@ -40,7 +40,7 @@ if defined?(StyleCapsule::Railtie)
             # Ensure assets config exists
             unless Rails.application.config.respond_to?(:assets)
               Rails.application.config.define_singleton_method(:assets) do
-                OpenStruct.new(paths: [])
+                StyleCapsule::SpecRailsMocks::AssetsConfig.new(paths: [])
               end
             end
 
@@ -48,7 +48,7 @@ if defined?(StyleCapsule::Railtie)
             FileUtils.mkdir_p(test_output_dir) unless Dir.exist?(test_output_dir)
 
             # Trigger the after_initialize callback
-            StyleCapsule::Railtie.config.after_initialize.each(&:call) if StyleCapsule::Railtie.config.respond_to?(:after_initialize)
+            described_class.config.after_initialize.each(&:call) if described_class.config.respond_to?(:after_initialize)
 
             # Verify the path was added
             expect(Rails.application.config.assets.paths).to include(test_output_dir)
@@ -73,7 +73,7 @@ if defined?(StyleCapsule::Railtie)
             # Ensure assets config exists
             unless Rails.application.config.respond_to?(:assets)
               Rails.application.config.define_singleton_method(:assets) do
-                OpenStruct.new(paths: [])
+                StyleCapsule::SpecRailsMocks::AssetsConfig.new(paths: [])
               end
             end
 
@@ -83,7 +83,7 @@ if defined?(StyleCapsule::Railtie)
             initial_paths_count = Rails.application.config.assets.paths.size
 
             # Trigger the after_initialize callback
-            StyleCapsule::Railtie.config.after_initialize.each(&:call) if StyleCapsule::Railtie.config.respond_to?(:after_initialize)
+            described_class.config.after_initialize.each(&:call) if described_class.config.respond_to?(:after_initialize)
 
             # Verify the path was not added
             expect(Rails.application.config.assets.paths.size).to eq(initial_paths_count)
@@ -105,7 +105,7 @@ if defined?(StyleCapsule::Railtie)
           begin
             # Should not raise an error
             expect {
-              StyleCapsule::Railtie.config.after_initialize.each(&:call) if StyleCapsule::Railtie.config.respond_to?(:after_initialize)
+              described_class.config.after_initialize.each(&:call) if described_class.config.respond_to?(:after_initialize)
             }.not_to raise_error
           ensure
             # Restore assets config
@@ -122,7 +122,7 @@ if defined?(StyleCapsule::Railtie)
         # Mock Rails.env to be development
         allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
         # Clear any existing callbacks
-        StyleCapsule::Railtie.config.to_prepare.clear if StyleCapsule::Railtie.config.respond_to?(:to_prepare)
+        described_class.config.to_prepare.clear if described_class.config.respond_to?(:to_prepare)
       end
 
       after do
@@ -139,8 +139,7 @@ if defined?(StyleCapsule::Railtie)
           end
         end
 
-        # Set constant so class has a name
-        Object.const_set(klass_name, test_class)
+        stub_const(klass_name, test_class)
 
         begin
           # Include StyleCapsule::Component to register it and add clear_css_cache
@@ -153,13 +152,11 @@ if defined?(StyleCapsule::Railtie)
           allow(test_class).to receive(:clear_css_cache)
 
           # Trigger the to_prepare callback manually
-          StyleCapsule::Railtie.config.to_prepare.each(&:call) if StyleCapsule::Railtie.config.respond_to?(:to_prepare)
+          described_class.config.to_prepare.each(&:call) if described_class.config.respond_to?(:to_prepare)
 
           # Verify clear_css_cache was called
           expect(test_class).to have_received(:clear_css_cache)
         ensure
-          # Clean up
-          Object.send(:remove_const, klass_name) if Object.const_defined?(klass_name)
           StyleCapsule::ClassRegistry.clear
         end
       end
@@ -177,8 +174,7 @@ if defined?(StyleCapsule::Railtie)
           end
         end
 
-        # Set constant so class has a name
-        Object.const_set(klass_name, error_class)
+        stub_const(klass_name, error_class)
 
         begin
           # Include StyleCapsule::Component to register it
@@ -187,11 +183,9 @@ if defined?(StyleCapsule::Railtie)
           # Should not raise an error even when clear_css_cache fails
           expect {
             # Trigger the to_prepare callback manually
-            StyleCapsule::Railtie.config.to_prepare.each(&:call) if StyleCapsule::Railtie.config.respond_to?(:to_prepare)
+            described_class.config.to_prepare.each(&:call) if described_class.config.respond_to?(:to_prepare)
           }.not_to raise_error
         ensure
-          # Clean up
-          Object.send(:remove_const, klass_name) if Object.const_defined?(klass_name)
           StyleCapsule::ClassRegistry.clear
         end
       end
@@ -205,8 +199,7 @@ if defined?(StyleCapsule::Railtie)
           end
         end
 
-        # Set constant so class has a name
-        Object.const_set(klass_name, no_cache_class)
+        stub_const(klass_name, no_cache_class)
 
         begin
           # Register it manually (not via include, so no clear_css_cache)
@@ -215,11 +208,9 @@ if defined?(StyleCapsule::Railtie)
           # Should not raise an error
           expect {
             # Trigger the to_prepare callback manually
-            StyleCapsule::Railtie.config.to_prepare.each(&:call) if StyleCapsule::Railtie.config.respond_to?(:to_prepare)
+            described_class.config.to_prepare.each(&:call) if described_class.config.respond_to?(:to_prepare)
           }.not_to raise_error
         ensure
-          # Clean up
-          Object.send(:remove_const, klass_name) if Object.const_defined?(klass_name)
           StyleCapsule::ClassRegistry.clear
         end
       end

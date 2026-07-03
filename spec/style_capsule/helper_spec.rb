@@ -244,10 +244,12 @@ RSpec.describe StyleCapsule::Helper do
 
     it "calls render_head_stylesheets with self as view_context" do
       helper.register_stylesheet("stylesheets/my_component")
-      expect(StyleCapsule::StylesheetRegistry).to receive(:render_head_stylesheets)
+      allow(StyleCapsule::StylesheetRegistry).to receive(:render_head_stylesheets)
         .with(helper, namespace: nil)
         .and_return('<link rel="stylesheet">')
       helper.stylesheet_registry_tags
+      expect(StyleCapsule::StylesheetRegistry).to have_received(:render_head_stylesheets)
+        .with(helper, namespace: nil)
     end
   end
 

@@ -12,8 +12,7 @@ RSpec.describe "StyleCapsule Phlex Integration", type: :integration do
 
   let(:view_context_double) do
     double("ViewContext").tap do |vc|
-      allow(vc).to receive(:stylesheet_link_tag).and_return('<link rel="stylesheet">')
-      allow(vc).to receive(:content_tag).and_return("<div></div>")
+      allow(vc).to receive_messages(stylesheet_link_tag: '<link rel="stylesheet">', content_tag: "<div></div>")
     end
   end
 

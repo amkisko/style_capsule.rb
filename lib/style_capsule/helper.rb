@@ -83,6 +83,7 @@ module StyleCapsule
     #     <style>.section { color: red; }</style>
     #     <div class="section">Content</div>
     #   <% end %>
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- ERB helper extracts styles and wraps scoped markup
     def style_capsule(css_content = nil, capsule_id: nil, tag: :div, &content_block)
       html_content = nil
 
@@ -125,6 +126,7 @@ module StyleCapsule
 
       (style_tag + wrapped_content).html_safe
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     # Register a stylesheet file for head rendering
     #

@@ -103,22 +103,22 @@ module StyleCapsule
       def configure(output_dir: nil, filename_pattern: nil, enabled: true, fallback_dir: nil)
         clear_file_path_hit_cache!
         @enabled = enabled
-
-        @output_dir = if output_dir
-          output_dir.is_a?(Pathname) ? output_dir : Pathname.new(output_dir.to_s)
-        elsif rails_available?
-          Rails.root.join(DEFAULT_OUTPUT_DIR)
-        else
-          Pathname.new(DEFAULT_OUTPUT_DIR)
-        end
-
-        @fallback_dir = if fallback_dir
-          fallback_dir.is_a?(Pathname) ? fallback_dir : Pathname.new(fallback_dir.to_s)
-        else
-          Pathname.new(FALLBACK_OUTPUT_DIR)
-        end
-
+        @output_dir = resolve_output_dir(output_dir)
+        @fallback_dir = resolve_path(fallback_dir, FALLBACK_OUTPUT_DIR)
         @filename_pattern = filename_pattern || default_filename_pattern
+      end
+
+      def resolve_output_dir(output_dir)
+        return resolve_path(output_dir, DEFAULT_OUTPUT_DIR) if output_dir
+        return Rails.root.join(DEFAULT_OUTPUT_DIR) if rails_available?
+
+        Pathname.new(DEFAULT_OUTPUT_DIR)
+      end
+
+      def resolve_path(dir, default_path)
+        return Pathname.new(default_path) unless dir
+
+        dir.is_a?(Pathname) ? dir : Pathname.new(dir.to_s)
       end
 
       # Write CSS content to file
@@ -127,6 +127,7 @@ module StyleCapsule
       # @param component_class [Class] Component class that generated the CSS
       # @param capsule_id [String] Capsule ID for the component
       # @return [String, nil] Relative file path (for stylesheet_link_tag) or nil if disabled/failed
+      # rubocop:disable Metrics/AbcSize -- writes asset file with fallback and instrumentation paths
       def write_css(css_content:, component_class:, capsule_id:)
         return nil unless enabled?
 
@@ -201,6 +202,7 @@ module StyleCapsule
         remember_file_path_hit("#{component_class.name}:#{capsule_id}", rel)
         rel
       end
+      # rubocop:enable Metrics/AbcSize
 
       # Check if file exists for given component and capsule
       #

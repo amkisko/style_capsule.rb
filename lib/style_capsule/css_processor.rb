@@ -40,6 +40,7 @@ module StyleCapsule
     # @param component_class [Class, String, nil] Optional component class for instrumentation
     # @return [String] CSS with scoped selectors
     # @raise [ArgumentError] If CSS content exceeds maximum size or capsule_id is invalid
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- selector patching walks CSS rules
     def self.scope_selectors(css_string, capsule_id, component_class: nil)
       return css_string if css_string.nil? || css_string.strip.empty?
 
@@ -111,6 +112,7 @@ module StyleCapsule
         css_without_comments
       end
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     # Scope CSS using CSS nesting (wraps entire CSS in [data-capsule] { ... })
     #

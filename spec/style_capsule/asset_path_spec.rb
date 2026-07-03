@@ -37,7 +37,7 @@ RSpec.describe StyleCapsule::AssetPath do
     it "rejects paths exceeding max length" do
       expect {
         described_class.validate_logical_path!("a" * (described_class::MAX_PATH_LENGTH + 1))
-      }.to raise_error(ArgumentError, /max #{described_class::MAX_PATH_LENGTH}/)
+      }.to raise_error(ArgumentError, /max #{described_class::MAX_PATH_LENGTH}/o)
     end
 
     it "rejects injection characters" do

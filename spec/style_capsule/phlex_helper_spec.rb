@@ -2,7 +2,7 @@
 
 RSpec.describe StyleCapsule::PhlexHelper do
   let(:view_context_double) do
-    instance_double("ActionView::Base",
+    instance_double(ActionView::Base,
       stylesheet_link_tag: '<link rel="stylesheet">',
       content_tag: "<style></style>")
   end
@@ -125,10 +125,12 @@ RSpec.describe StyleCapsule::PhlexHelper do
     it "calls render_head_stylesheets with view_context" do
       helper.register_stylesheet("stylesheets/my_component")
       view_context = helper.view_context
-      expect(StyleCapsule::StylesheetRegistry).to receive(:render_head_stylesheets)
+      allow(StyleCapsule::StylesheetRegistry).to receive(:render_head_stylesheets)
         .with(view_context, namespace: nil)
         .and_return('<link rel="stylesheet">')
       helper.stylesheet_registry_tags
+      expect(StyleCapsule::StylesheetRegistry).to have_received(:render_head_stylesheets)
+        .with(view_context, namespace: nil)
     end
 
     it "renders registered stylesheets and clears registry" do
@@ -150,10 +152,12 @@ RSpec.describe StyleCapsule::PhlexHelper do
     it "passes namespace to render_head_stylesheets" do
       helper.register_stylesheet("stylesheets/admin", namespace: :admin)
       view_context = helper.view_context
-      expect(StyleCapsule::StylesheetRegistry).to receive(:render_head_stylesheets)
+      allow(StyleCapsule::StylesheetRegistry).to receive(:render_head_stylesheets)
         .with(view_context, namespace: :admin)
         .and_return('<link rel="stylesheet">')
       helper.stylesheet_registry_tags(namespace: :admin)
+      expect(StyleCapsule::StylesheetRegistry).to have_received(:render_head_stylesheets)
+        .with(view_context, namespace: :admin)
     end
 
     it "uses safe() method when available (Phlex component)" do

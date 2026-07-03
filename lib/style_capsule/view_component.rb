@@ -147,6 +147,7 @@ module StyleCapsule
     # File caching is only allowed for class method component_styles.
     #
     # @return [String] HTML string with style tag or empty string
+    # rubocop:disable Metrics/AbcSize -- coordinates head vs body rendering, caching, and registry
     def render_capsule_styles
       css_content = component_styles_content
       return "".html_safe if css_content.nil? || css_content.to_s.strip.empty?
@@ -192,6 +193,7 @@ module StyleCapsule
         helpers.content_tag(:style, scoped_css.html_safe, type: "text/css")
       end
     end
+    # rubocop:enable Metrics/AbcSize
 
     # Check if component should use head rendering
     #

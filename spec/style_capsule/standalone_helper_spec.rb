@@ -56,16 +56,15 @@ RSpec.describe StyleCapsule::StandaloneHelper do
     end
 
     it "caches scoped CSS in thread-local storage" do
+      Thread.current[:style_capsule_scope_cache] = nil
       css = ".section { color: red; }"
       capsule_id = "abc123"
 
-      # First call
+      allow(StyleCapsule::CssProcessor).to receive(:scope_selectors).and_call_original
       scoped1 = helper.scope_css(css, capsule_id)
-
-      # Second call should use cache
-      expect(StyleCapsule::CssProcessor).not_to receive(:scope_selectors)
       scoped2 = helper.scope_css(css, capsule_id)
 
+      expect(StyleCapsule::CssProcessor).to have_received(:scope_selectors).once
       expect(scoped1).to eq(scoped2)
     end
 
@@ -297,10 +296,12 @@ RSpec.describe StyleCapsule::StandaloneHelper do
 
     it "calls render_head_stylesheets with self as view_context" do
       helper.register_stylesheet("stylesheets/main")
-      expect(StyleCapsule::StylesheetRegistry).to receive(:render_head_stylesheets)
+      allow(StyleCapsule::StylesheetRegistry).to receive(:render_head_stylesheets)
         .with(helper, namespace: nil)
         .and_return('<link rel="stylesheet">')
       result = helper.stylesheet_registry_tags
+      expect(StyleCapsule::StylesheetRegistry).to have_received(:render_head_stylesheets)
+        .with(helper, namespace: nil)
       expect(result).to eq('<link rel="stylesheet">')
     end
   end

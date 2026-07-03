@@ -170,6 +170,7 @@ module StyleCapsule
     # @param head_rendering [Boolean, nil] Enable head rendering (default: true if any option is set, false otherwise)
     # @param tag [Symbol, String, nil] HTML tag name for wrapper element (default: :div)
     # @return [void]
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- DSL configures multiple optional class settings
     def style_capsule(namespace: nil, cache_strategy: nil, cache_ttl: nil, cache_proc: nil, scoping_strategy: nil, head_rendering: nil, tag: nil)
       # Set namespace (stored in instance variable, but getter checks parent class for inheritance)
       if namespace
@@ -205,6 +206,7 @@ module StyleCapsule
         @head_rendering = head_rendering
       end
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     # Get the custom scope ID if set (alias for capsule_id getter)
     def custom_capsule_id

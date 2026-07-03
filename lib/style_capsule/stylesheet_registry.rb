@@ -265,6 +265,7 @@ module StyleCapsule
     # @param component_class [Class, nil] Component class (for :file strategy)
     # @param stylesheet_link_options [Hash, nil] Options for stylesheet_link_tag (for :file strategy)
     # @return [void]
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- coordinates file, inline, and cache registration
     def self.register_inline(css_content, namespace: nil, capsule_id: nil, cache_key: nil, cache_strategy: :none, cache_ttl: nil, cache_proc: nil, component_class: nil, stylesheet_link_options: nil)
       ns = normalize_namespace(namespace)
 
@@ -333,6 +334,7 @@ module StyleCapsule
         cache_inline_css(cache_key, css_content, cache_strategy: cache_strategy, cache_ttl: cache_ttl, cache_proc: cache_proc, capsule_id: capsule_id, namespace: ns)
       end
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     # Get cached inline CSS if available and not expired
     #
@@ -562,6 +564,7 @@ module StyleCapsule
     #   If nil, falls back to basic HTML generation
     # @param namespace [Symbol, String, nil] Optional namespace to render (nil/blank renders all namespaces)
     # @return [String] HTML-safe string with stylesheet tags
+    # rubocop:disable Metrics/AbcSize, Metrics/PerceivedComplexity -- renders mixed inline and file registrations
     def self.render_head_stylesheets(view_context = nil, namespace: nil)
       if namespace.nil? || namespace.to_s.strip.empty?
         all_stylesheets = merged_file_registrations_all_namespaces
@@ -599,11 +602,13 @@ module StyleCapsule
 
       end
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/PerceivedComplexity
 
     # Check if there are any registered stylesheets
     #
     # @param namespace [Symbol, String, nil] Optional namespace to check (nil checks all)
     # @return [Boolean]
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- checks manifest and request-scoped registries
     def self.any?(namespace: nil)
       if namespace.nil?
         # Check process-wide manifest
@@ -626,6 +631,7 @@ module StyleCapsule
         !!(has_files || has_request_files || has_inline)
       end
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     # Inject pending request-scoped stylesheets into an HTML document before +</head>+.
     #

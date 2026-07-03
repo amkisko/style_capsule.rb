@@ -95,6 +95,8 @@ RSpec.describe "StyleCapsule ViewComponent Integration", type: :integration do
     klass.class_eval do
       include StyleCapsule::ViewComponentHelper
 
+      attr_reader :view_context
+
       def initialize(view_context: nil, **kwargs)
         # ViewComponent::Base may have its own initialize, but we don't call super
         # to avoid argument mismatch issues in tests
@@ -102,7 +104,7 @@ RSpec.describe "StyleCapsule ViewComponent Integration", type: :integration do
       end
 
       def helpers
-        @view_context
+        view_context
       end
     end
     klass

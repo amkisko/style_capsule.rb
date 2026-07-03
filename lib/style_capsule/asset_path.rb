@@ -14,28 +14,26 @@ module StyleCapsule
       end
 
       s = path.strip
-      if s.empty?
-        raise ArgumentError, "stylesheet path cannot be empty"
-      end
-
-      if s.start_with?("/")
-        raise ArgumentError, "invalid stylesheet path (no leading slash / absolute URL path): #{path.inspect}"
-      end
-
-      if s.length > MAX_PATH_LENGTH
-        raise ArgumentError, "invalid stylesheet path (max #{MAX_PATH_LENGTH} characters, got #{s.length})"
-      end
-
-      if s.split("/").any? { |segment| segment == ".." }
-        raise ArgumentError, "invalid stylesheet path (parent segments not allowed): #{path.inspect}"
-      end
-
-      # Block characters that break HTML attributes or paths
-      if /["<>|\0\\]/.match?(s)
-        raise ArgumentError, "invalid stylesheet path (disallowed characters): #{path.inspect}"
-      end
-
+      validate_non_empty_path!(s)
+      validate_path_segments!(s, path)
       s
     end
+
+    def self.validate_non_empty_path!(stripped_path)
+      raise ArgumentError, "stylesheet path cannot be empty" if stripped_path.empty?
+      raise ArgumentError, "invalid stylesheet path (no leading slash / absolute URL path): #{stripped_path.inspect}" if stripped_path.start_with?("/")
+      raise ArgumentError, "invalid stylesheet path (max #{MAX_PATH_LENGTH} characters, got #{stripped_path.length})" if stripped_path.length > MAX_PATH_LENGTH
+    end
+
+    def self.validate_path_segments!(stripped_path, original_path)
+      if stripped_path.split("/").any? { |segment| segment == ".." }
+        raise ArgumentError, "invalid stylesheet path (parent segments not allowed): #{original_path.inspect}"
+      end
+
+      if /["<>|\0\\]/.match?(stripped_path)
+        raise ArgumentError, "invalid stylesheet path (disallowed characters): #{original_path.inspect}"
+      end
+    end
+    private_class_method :validate_non_empty_path!, :validate_path_segments!
   end
 end

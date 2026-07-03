@@ -8,7 +8,6 @@ require "securerandom"
 RSpec.describe "style_capsule rake tasks" do
   let(:test_output_dir) { Pathname.new(Dir.mktmpdir("style_capsule_rake_test_#{SecureRandom.hex(4)}_")) }
   let(:original_output_dir) { StyleCapsule::CssFileWriter.output_dir }
-  let(:component_classes) { [] }
 
   before do
     # Create mock :environment task (required by rake tasks)
@@ -34,9 +33,6 @@ RSpec.describe "style_capsule rake tasks" do
     # Reload tasks
     load File.expand_path("../../lib/tasks/style_capsule.rake", __dir__)
 
-    # Store component classes for cleanup
-    @created_components = []
-
     # Clear any existing files before each test
     StyleCapsule::CssFileWriter.clear_files
   end
@@ -44,13 +40,6 @@ RSpec.describe "style_capsule rake tasks" do
   after do
     # Clean up generated files first (before removing components)
     StyleCapsule::CssFileWriter.clear_files
-
-    # Clean up created components
-    @created_components.each do |component_class|
-      if component_class.name && Object.const_defined?(component_class.name)
-        Object.send(:remove_const, component_class.name)
-      end
-    end
 
     FileUtils.rm_rf(test_output_dir) if Dir.exist?(test_output_dir)
 
@@ -72,12 +61,11 @@ RSpec.describe "style_capsule rake tasks" do
     # Create class without block first to get a name
     component_class = Class.new(Phlex::HTML)
     const_name = "RakeTest#{name}_#{component_class.object_id}"
-    Object.const_set(const_name, component_class)
+    stub_const(const_name, component_class)
 
     # Now evaluate the block (which includes StyleCapsule::Component) so it gets registered
     component_class.class_eval(&block) if block_given?
 
-    @created_components << component_class
     component_class
   end
 
@@ -87,12 +75,11 @@ RSpec.describe "style_capsule rake tasks" do
     # Create class without block first to get a name
     component_class = Class.new(ViewComponent::Base)
     const_name = "RakeTest#{name}_#{component_class.object_id}"
-    Object.const_set(const_name, component_class)
+    stub_const(const_name, component_class)
 
     # Now evaluate the block (which includes StyleCapsule::ViewComponent) so it gets registered
     component_class.class_eval(&block) if block_given?
 
-    @created_components << component_class
     component_class
   end
 
@@ -477,7 +464,9 @@ RSpec.describe "style_capsule rake tasks" do
         phlex_const = Object.const_get(:Phlex) if phlex_defined && Object.const_defined?(:Phlex)
 
         begin
+          # rubocop:disable RSpec/RemoveConst -- simulate Phlex not being loaded
           Object.send(:remove_const, :Phlex) if Object.const_defined?(:Phlex)
+          # rubocop:enable RSpec/RemoveConst
 
           # Task should still run without error
           expect {
@@ -497,6 +486,7 @@ RSpec.describe "style_capsule rake tasks" do
         skip "ViewComponent not available" unless defined?(ViewComponent::Base)
 
         # Mock ViewComponent to raise an error when checking inheritance
+        # rubocop:disable RSpec/AnyInstance -- must intercept inheritance checks across anonymous component classes
         allow_any_instance_of(Class).to receive(:<).and_call_original
         allow_any_instance_of(Class).to receive(:<).with(ViewComponent::Base) do |klass|
           # Simulate a loading error for some classes
@@ -506,6 +496,7 @@ RSpec.describe "style_capsule rake tasks" do
             klass.superclass == ViewComponent::Base || klass.ancestors.include?(ViewComponent::Base)
           end
         end
+        # rubocop:enable RSpec/AnyInstance
 
         # Task should still run without error
         expect {
@@ -521,7 +512,9 @@ RSpec.describe "style_capsule rake tasks" do
         vc_const = Object.const_get(:ViewComponent) if vc_defined && Object.const_defined?(:ViewComponent)
 
         begin
+          # rubocop:disable RSpec/RemoveConst -- simulate ViewComponent not being loaded
           Object.send(:remove_const, :ViewComponent) if Object.const_defined?(:ViewComponent)
+          # rubocop:enable RSpec/RemoveConst
 
           # Task should still run without error
           expect {

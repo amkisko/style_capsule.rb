@@ -19,6 +19,12 @@ module StyleCapsule
       return [status, headers, response] unless inject_response?(status, headers, response)
       return [status, headers, response] unless StylesheetRegistry.pending_head_stylesheets?
 
+      maybe_inject_head_styles(status, headers, response, env)
+    end
+
+    private
+
+    def maybe_inject_head_styles(status, headers, response, env)
       body = read_response_body(response)
       return [status, headers, response] if body.empty?
 
@@ -32,8 +38,6 @@ module StyleCapsule
       [status, headers, [injected_body]]
     end
 
-    private
-
     def inject_response?(status, headers, response)
       return false unless SUCCESS_STATUS.cover?(status)
       return false unless html_content_type?(headers["Content-Type"])
@@ -45,11 +49,11 @@ module StyleCapsule
 
     def chunked_response?(headers)
       transfer_encoding = headers["Transfer-Encoding"]
-      transfer_encoding && transfer_encoding.match?(/chunked/i)
+      transfer_encoding&.match?(/chunked/i)
     end
 
     def html_content_type?(content_type)
-      return false if content_type.nil? || content_type.empty?
+      return false if content_type.blank?
 
       content_type.split(";", 2).first.to_s.strip.match?(HTML_CONTENT_TYPE)
     end

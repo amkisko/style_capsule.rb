@@ -19,25 +19,30 @@ module StyleCapsule
       segments = []
 
       until scanner.eos?
-        text = scanner.scan_until(STYLE_OPEN)
-        if text.nil?
-          html_out << scanner.rest
-          break
-        end
-
-        html_out << text.sub(STYLE_OPEN, "")
-
-        css = scanner.scan_until(STYLE_CLOSE)
-        if css.nil?
-          html_out << scanner.rest
-          break
-        end
-
-        segments << css.sub(STYLE_CLOSE, "")
+        break unless collect_style_segment!(scanner, html_out, segments)
       end
 
       combined = segments.empty? ? nil : segments.join("\n\n")
       [html_out.strip, combined]
+    end
+
+    def collect_style_segment!(scanner, html_out, segments)
+      text = scanner.scan_until(STYLE_OPEN)
+      if text.nil?
+        html_out << scanner.rest
+        return false
+      end
+
+      html_out << text.sub(STYLE_OPEN, "")
+
+      css = scanner.scan_until(STYLE_CLOSE)
+      if css.nil?
+        html_out << scanner.rest
+        return false
+      end
+
+      segments << css.sub(STYLE_CLOSE, "")
+      true
     end
 
     def scope_css_with_bounded_cache(css_content, capsule_id)

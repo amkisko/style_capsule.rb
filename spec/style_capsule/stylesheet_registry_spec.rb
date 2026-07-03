@@ -191,8 +191,7 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
 
     context "with view context" do
       before do
-        allow(view_context).to receive(:stylesheet_link_tag).and_return('<link rel="stylesheet">')
-        allow(view_context).to receive(:content_tag).and_return("<style></style>")
+        allow(view_context).to receive_messages(stylesheet_link_tag: '<link rel="stylesheet">', content_tag: "<style></style>")
       end
 
       it "renders file-based stylesheets" do
@@ -256,8 +255,7 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
     it "handles mixed file and inline stylesheets" do
       described_class.register("stylesheets/one")
       described_class.register_inline(".two { color: blue; }")
-      allow(view_context).to receive(:stylesheet_link_tag).and_return('<link rel="stylesheet">')
-      allow(view_context).to receive(:content_tag).and_return("<style></style>")
+      allow(view_context).to receive_messages(stylesheet_link_tag: '<link rel="stylesheet">', content_tag: "<style></style>")
       result = described_class.render_head_stylesheets(view_context)
       expect(result).to include("stylesheet")
       expect(result).to include("style")
@@ -266,8 +264,7 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
     it "renders specific namespace with mixed file and inline stylesheets" do
       described_class.register("stylesheets/admin", namespace: :admin)
       described_class.register_inline(".admin { color: red; }", namespace: :admin)
-      allow(view_context).to receive(:stylesheet_link_tag).and_return('<link rel="stylesheet">')
-      allow(view_context).to receive(:content_tag).and_return("<style></style>")
+      allow(view_context).to receive_messages(stylesheet_link_tag: '<link rel="stylesheet">', content_tag: "<style></style>")
       result = described_class.render_head_stylesheets(view_context, namespace: :admin)
       expect(result).to include("stylesheet")
       expect(result).to include("style")

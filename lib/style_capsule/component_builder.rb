@@ -85,6 +85,7 @@ module StyleCapsule
       # @param component_class [Class] Component class to build
       # @param output_proc [Proc, nil] Optional proc to call with output messages
       # @return [String, nil] Generated file path or nil if skipped
+      # rubocop:disable Metrics/AbcSize -- file build path with instrumentation and error handling
       def build_component(component_class, output_proc: nil)
         return nil unless component_class.inline_cache_strategy == :file
         # Check for class method component_styles (required for file caching)
@@ -117,6 +118,7 @@ module StyleCapsule
           nil
         end
       end
+      # rubocop:enable Metrics/AbcSize
 
       # Build CSS files for all components
       #

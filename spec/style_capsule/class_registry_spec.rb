@@ -313,8 +313,7 @@ RSpec.describe StyleCapsule::ClassRegistry do
         end
       end
 
-      # Set the constant first so the class has a name
-      Object.const_set(klass_name, klass)
+      stub_const(klass_name, klass)
 
       begin
         # Now include the module - this should register the class
@@ -323,8 +322,7 @@ RSpec.describe StyleCapsule::ClassRegistry do
         # The include StyleCapsule::Component should have registered it
         expect(described_class.all).to include(klass)
       ensure
-        # Clean up
-        Object.send(:remove_const, klass_name) if Object.const_defined?(klass_name)
+        described_class.clear
       end
     end
   end

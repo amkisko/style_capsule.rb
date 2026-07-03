@@ -67,14 +67,7 @@ module StyleCapsule
         return yield
       end
 
-      # Calculate input size if not provided but css_content/input is in payload
-      unless payload[:input_size]
-        if payload[:css_content]
-          payload[:input_size] = payload[:css_content].bytesize
-        elsif payload[:input]
-          payload[:input_size] = payload[:input].bytesize
-        end
-      end
+      apply_input_size!(payload)
 
       # Use ActiveSupport::Notifications.instrument which automatically:
       # - Measures duration using monotonic time (available in event.duration)
@@ -88,6 +81,14 @@ module StyleCapsule
 
       result
     end
+
+    def self.apply_input_size!(payload)
+      return if payload[:input_size]
+
+      source = payload[:css_content] || payload[:input]
+      payload[:input_size] = source.bytesize if source
+    end
+    private_class_method :apply_input_size!
 
     # Instrument an event without a block (for events that don't have duration)
     #

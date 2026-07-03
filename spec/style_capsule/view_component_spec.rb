@@ -7,10 +7,30 @@ require "fileutils"
 RSpec.describe StyleCapsule::ViewComponent do
   before do
     skip "view_component not available" unless defined?(ViewComponent::Base)
+    StyleCapsule::StylesheetRegistry.clear
+    allow(view_context_double).to receive(:content_tag) do |tag, content = nil, options = {}, &block|
+      if block_given?
+        content = block.call
+      end
+      content ||= ""
+      attrs = if options.is_a?(Hash) && !options.empty?
+        if options[:data]
+          data_attrs = options[:data].map { |k, v| %(data-#{k}="#{v}") }.join(" ")
+          other_attrs = options.except(:data).map { |k, v| %(#{k}="#{v}") }.join(" ")
+          [data_attrs, other_attrs].reject(&:empty?).join(" ")
+        else
+          options.map { |k, v| %(#{k}="#{v}") }.join(" ")
+        end
+      else
+        ""
+      end
+      attrs = " #{attrs}" unless attrs.empty?
+      "<#{tag}#{attrs}>#{content}</#{tag}>"
+    end
   end
 
   let(:view_context_double) do
-    instance_double("ActionView::Base",
+    instance_double(ActionView::Base,
       content_tag: "<div>content</div>",
       stylesheet_link_tag: '<link rel="stylesheet">')
   end
@@ -46,29 +66,6 @@ RSpec.describe StyleCapsule::ViewComponent do
     instance = component_class.new
     instance.view_context_double = view_context_double
     instance
-  end
-
-  before do
-    StyleCapsule::StylesheetRegistry.clear
-    allow(view_context_double).to receive(:content_tag) do |tag, content = nil, options = {}, &block|
-      if block_given?
-        content = block.call
-      end
-      content ||= ""
-      attrs = if options.is_a?(Hash) && !options.empty?
-        if options[:data]
-          data_attrs = options[:data].map { |k, v| %(data-#{k}="#{v}") }.join(" ")
-          other_attrs = options.except(:data).map { |k, v| %(#{k}="#{v}") }.join(" ")
-          [data_attrs, other_attrs].reject(&:empty?).join(" ")
-        else
-          options.map { |k, v| %(#{k}="#{v}") }.join(" ")
-        end
-      else
-        ""
-      end
-      attrs = " #{attrs}" unless attrs.empty?
-      "<#{tag}#{attrs}>#{content}</#{tag}>"
-    end
   end
 
   describe "inclusion" do
@@ -534,7 +531,7 @@ RSpec.describe StyleCapsule::ViewComponent do
           include StyleCapsule::ViewComponent
 
           def helpers
-            instance_double("ActionView::Base")
+            instance_double(ActionView::Base)
           end
 
           def component_styles
@@ -589,7 +586,7 @@ RSpec.describe StyleCapsule::ViewComponent do
         include StyleCapsule::ViewComponent
 
         def helpers
-          instance_double("ActionView::Base")
+          instance_double(ActionView::Base)
         end
       end.new
       expect(component_without_styles.send(:component_styles?)).to be false
@@ -600,7 +597,7 @@ RSpec.describe StyleCapsule::ViewComponent do
         include StyleCapsule::ViewComponent
 
         def helpers
-          instance_double("ActionView::Base")
+          instance_double(ActionView::Base)
         end
 
         def component_styles
@@ -635,9 +632,7 @@ RSpec.describe StyleCapsule::ViewComponent do
       end.new
 
       component_without_styles.view_context_double = view_context_double
-      allow(view_context_double).to receive(:content_tag).with(:div, "No styles") do
-        "<div>No styles</div>"
-      end
+      allow(view_context_double).to receive(:content_tag).with(:div, "No styles").and_return("<div>No styles</div>")
 
       output = component_without_styles.call
       expect(output).to include("No styles")

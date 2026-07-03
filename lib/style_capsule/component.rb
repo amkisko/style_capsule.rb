@@ -148,6 +148,7 @@ module StyleCapsule
     #
     # Supports both instance method (def component_styles) and class method (def self.component_styles).
     # File caching is only allowed for class method component_styles.
+    # rubocop:disable Metrics/AbcSize -- coordinates head vs body rendering, caching, and registry
     def render_capsule_styles
       css_content = component_styles_content
       return if css_content.nil? || css_content.to_s.strip.empty?
@@ -198,6 +199,7 @@ module StyleCapsule
         end
       end
     end
+    # rubocop:enable Metrics/AbcSize
 
     # Check if component should use head rendering
     #

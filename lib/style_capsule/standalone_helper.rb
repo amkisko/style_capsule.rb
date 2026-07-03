@@ -53,6 +53,7 @@ module StyleCapsule
     # @param options [Hash] HTML attributes
     # @param block [Proc] Block for tag content
     # @return [String] HTML string
+    # rubocop:disable Metrics/AbcSize -- serializes flat and nested HTML attributes
     def content_tag(tag, content = nil, **options, &block)
       tag_name = tag.to_s
       content = capture(&block) if block_given? && content.nil?
@@ -70,6 +71,7 @@ module StyleCapsule
       attrs = " #{attrs}" unless attrs.empty?
       "<#{tag_name}#{attrs}>#{content}</#{tag_name}>"
     end
+    # rubocop:enable Metrics/AbcSize
 
     # Capture block content (simplified version without Rails)
     #
@@ -108,6 +110,7 @@ module StyleCapsule
     # @param capsule_id [String, nil] Optional capsule ID
     # @param content_block [Proc] Block containing HTML content
     # @return [String] HTML with scoped CSS and wrapped content
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- standalone helper mirrors Rails helper flow
     def style_capsule(css_content = nil, capsule_id: nil, tag: :div, &content_block)
       html_content = nil
 
@@ -149,6 +152,7 @@ module StyleCapsule
 
       html_safe(style_tag + wrapped_content)
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     # Register a stylesheet file for head rendering
     #

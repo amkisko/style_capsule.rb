@@ -16,9 +16,18 @@ end
 require "rspec"
 require "rspec/mocks"
 require "active_support/all"
-require "ostruct"
 require "tmpdir"
 require "fileutils"
+
+module StyleCapsule
+  # Lightweight Rails test doubles (avoid ostruct stdlib deprecation on Ruby 3.5+)
+  module SpecRailsMocks
+    AssetsConfig = Struct.new(:paths, keyword_init: true)
+
+    RoutesConfig = Struct.new(:url_helpers, keyword_init: true)
+    ApplicationConfig = Struct.new(:assets, keyword_init: true)
+  end
+end
 
 # Mock Rails constant if it doesn't exist (needed for railties and ViewComponent)
 unless defined?(Rails)
@@ -59,7 +68,9 @@ unless defined?(Rails)
       end
 
       def self.config
-        @config ||= OpenStruct.new(assets: OpenStruct.new(paths: []))
+        @config ||= StyleCapsule::SpecRailsMocks::ApplicationConfig.new(
+          assets: StyleCapsule::SpecRailsMocks::AssetsConfig.new(paths: [])
+        )
       end
 
       def self.config=(value)
@@ -67,7 +78,7 @@ unless defined?(Rails)
       end
 
       def routes
-        @routes ||= ::OpenStruct.new(url_helpers: Module.new)
+        @routes ||= StyleCapsule::SpecRailsMocks::RoutesConfig.new(url_helpers: Module.new)
       end
     end
 
@@ -85,7 +96,7 @@ begin
     module Rails
       class Railtie
         def self.config
-          @config ||= OpenStruct.new
+          @config ||= ActiveSupport::OrderedOptions.new
         end
 
         def self.config=(value)
@@ -194,7 +205,7 @@ RSpec.configure do |config|
   end
 
   # Reset CurrentAttributes after each test (if available)
-  config.after(:each) do
+  config.after do
     # Only call reset if we're actually using CurrentAttributes
     # Check both respond_to? and that it's actually a CurrentAttributes method
     if StyleCapsule::StylesheetRegistry.respond_to?(:reset) &&
