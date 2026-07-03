@@ -72,9 +72,12 @@ end
 #   <%= stylesheet_registry_tags(namespace: :admin) %>
 #
 # @example Namespace Support
-#   # Register stylesheets with namespaces
-#   StyleCapsule::StylesheetRegistry.register('stylesheets/admin/dashboard', namespace: :admin)
-#   StyleCapsule::StylesheetRegistry.register('stylesheets/user/profile', namespace: :user)
+#   # Eager registrations (boot / class load; process-wide manifest)
+#   StyleCapsule::StylesheetRegistry.register_eager('stylesheets/admin/dashboard', namespace: :admin)
+#   StyleCapsule::StylesheetRegistry.register_eager('stylesheets/user/profile', namespace: :user)
+#
+#   # Render-time registrations (request-scoped; also picked up by HeadInjectionMiddleware)
+#   StyleCapsule::StylesheetRegistry.register('stylesheets/page', namespace: :user)
 #
 #   # Render all namespaces (default)
 #   <%= stylesheet_registry_tags %>
@@ -85,7 +88,7 @@ end
 # @example File-Based Caching (HTTP Caching)
 #   class MyComponent < ApplicationComponent
 #     include StyleCapsule::Component
-#     stylesheet_registry cache_strategy: :file  # Writes CSS to files for HTTP caching
+#     style_capsule cache_strategy: :file  # Writes CSS to files for HTTP caching
 #   end
 #
 #   # CSS files are written to app/assets/builds/capsules/
@@ -94,6 +97,8 @@ end
 module StyleCapsule
   require_relative "style_capsule/version"
   require_relative "style_capsule/instrumentation"
+  require_relative "style_capsule/asset_path"
+  require_relative "style_capsule/helper_scope_cache"
   require_relative "style_capsule/css_processor"
   require_relative "style_capsule/css_file_writer"
   require_relative "style_capsule/stylesheet_registry"

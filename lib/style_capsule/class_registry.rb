@@ -57,11 +57,12 @@ module StyleCapsule
 
       # Iterate over all registered classes
       #
+      # Prunes invalid entries on each call (linear in registry size). The set of StyleCapsule
+      # components is typically small, so this stays cheap compared to ObjectSpace scans.
+      #
       # @yield [Class] Each registered class
       # @return [void]
       def each(&block)
-        # Filter out classes that no longer exist or have been unloaded
-        # Use delete_if for Set (equivalent to reject! for Array)
         @classes.delete_if do |klass|
           # Check if class still exists and is valid
           klass.name.nil? || klass.singleton_class?

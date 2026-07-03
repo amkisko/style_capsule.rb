@@ -15,7 +15,7 @@ module StyleCapsule
   #
   # Usage in ViewComponent components:
   #   class MyComponent < ApplicationComponent
-  #     styles_namespace :user  # Set default namespace
+  #     style_capsule namespace: :user  # Set default namespace for register_stylesheet
   #
   #     def call
   #       register_stylesheet("stylesheets/user/my_component")  # Uses :user namespace automatically
@@ -32,7 +32,7 @@ module StyleCapsule
     #     content_tag(:div, "Content")
     #   end
     #
-    # If the component has a default namespace set via styles_namespace or stylesheet_registry,
+    # If the component has a default namespace set via style_capsule or stylesheet_registry,
     # it will be used automatically when namespace is not explicitly provided.
     #
     # @param file_path [String] Path to stylesheet (relative to app/assets/stylesheets)

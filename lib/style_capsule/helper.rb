@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "digest/sha1"
+require_relative "helper_scope_cache"
 # ActiveSupport string extensions are conditionally required in lib/style_capsule.rb
 
 module StyleCapsule
@@ -24,6 +25,8 @@ module StyleCapsule
   # The CSS will be automatically scoped and content wrapped in a scoped div.
   # The <style> tag will be extracted and processed separately.
   module Helper
+    include HelperScopeCache
+
     # Maximum HTML content size (10MB) to prevent DoS attacks
     MAX_HTML_SIZE = 10_000_000
     # Generate capsule ID based on caller location for uniqueness
@@ -36,16 +39,7 @@ module StyleCapsule
 
     # Scope CSS content and return scoped CSS
     def scope_css(css_content, capsule_id)
-      # Use thread-local cache to avoid reprocessing
-      cache_key = "style_capsule_#{capsule_id}"
-
-      if Thread.current[cache_key]
-        return Thread.current[cache_key]
-      end
-
-      scoped_css = CssProcessor.scope_selectors(css_content, capsule_id)
-      Thread.current[cache_key] = scoped_css
-      scoped_css
+      scope_css_with_bounded_cache(css_content, capsule_id)
     end
 
     # ERB helper: automatically wraps content in scoped div and processes CSS
@@ -102,17 +96,9 @@ module StyleCapsule
           raise ArgumentError, "HTML content exceeds maximum size of #{MAX_HTML_SIZE} bytes (got #{full_content.bytesize} bytes)"
         end
 
-        # Extract <style> tags from content
-        # Note: Pattern uses non-greedy matching (.*?) to minimize backtracking
-        # Size limit (MAX_HTML_SIZE) mitigates ReDoS risk from malicious input
-        style_match = full_content.match(/<style[^>]*>(.*?)<\/style>/m)
-        if style_match
-          css_content = style_match[1]
-          # Use sub instead of gsub to only remove first occurrence (reduces backtracking)
-          html_content = full_content.sub(/<style[^>]*>.*?<\/style>/m, "").strip
-        else
-          # No style tag found, treat entire content as HTML
-          css_content = nil
+        # Extract every <style> block; combine CSS, strip tags from markup
+        html_content, css_content = extract_styles_from_markup(full_content)
+        if css_content.nil?
           html_content = full_content
         end
       elsif css_content && block_given?

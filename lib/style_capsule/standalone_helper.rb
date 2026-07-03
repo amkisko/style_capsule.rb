@@ -2,6 +2,7 @@
 
 require "digest/sha1"
 require "cgi"
+require_relative "helper_scope_cache"
 
 module StyleCapsule
   # Standalone helper module for use without Rails
@@ -27,6 +28,8 @@ module StyleCapsule
   #     "<style>.section { color: red; }</style><div class='section'>Content</div>"
   #   end
   module StandaloneHelper
+    include HelperScopeCache
+
     # Maximum HTML content size (10MB) to prevent DoS attacks
     MAX_HTML_SIZE = 10_000_000
 
@@ -40,16 +43,7 @@ module StyleCapsule
 
     # Scope CSS content and return scoped CSS
     def scope_css(css_content, capsule_id)
-      # Use thread-local cache to avoid reprocessing
-      cache_key = "style_capsule_#{capsule_id}"
-
-      if Thread.current[cache_key]
-        return Thread.current[cache_key]
-      end
-
-      scoped_css = CssProcessor.scope_selectors(css_content, capsule_id)
-      Thread.current[cache_key] = scoped_css
-      scoped_css
+      scope_css_with_bounded_cache(css_content, capsule_id)
     end
 
     # Generate HTML tag without Rails helpers
@@ -114,7 +108,7 @@ module StyleCapsule
     # @param capsule_id [String, nil] Optional capsule ID
     # @param content_block [Proc] Block containing HTML content
     # @return [String] HTML with scoped CSS and wrapped content
-    def style_capsule(css_content = nil, capsule_id: nil, &content_block)
+    def style_capsule(css_content = nil, capsule_id: nil, tag: :div, &content_block)
       html_content = nil
 
       # If CSS content is provided as argument, use it
@@ -127,13 +121,8 @@ module StyleCapsule
           raise ArgumentError, "HTML content exceeds maximum size of #{MAX_HTML_SIZE} bytes (got #{full_content.bytesize} bytes)"
         end
 
-        # Extract <style> tags from content
-        style_match = full_content.match(/<style[^>]*>(.*?)<\/style>/m)
-        if style_match
-          css_content = style_match[1]
-          html_content = full_content.sub(/<style[^>]*>.*?<\/style>/m, "").strip
-        else
-          css_content = nil
+        html_content, css_content = extract_styles_from_markup(full_content)
+        if css_content.nil?
           html_content = full_content
         end
       elsif css_content && block_given?
@@ -156,7 +145,7 @@ module StyleCapsule
 
       # Render style tag and wrapped content
       style_tag = content_tag(:style, raw(scoped_css), type: "text/css")
-      wrapped_content = content_tag(:div, raw(html_content), data: {capsule: capsule_id})
+      wrapped_content = content_tag(tag, raw(html_content), data: {capsule: capsule_id})
 
       html_safe(style_tag + wrapped_content)
     end

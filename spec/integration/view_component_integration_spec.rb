@@ -255,8 +255,8 @@ RSpec.describe "StyleCapsule ViewComponent Integration", type: :integration do
       component = component_class.new(view_context: view_context)
       component.call
 
-      expect(StyleCapsule::StylesheetRegistry.manifest_files[:default]).not_to be_empty
-      expect(StyleCapsule::StylesheetRegistry.manifest_files[:default].first[:file_path]).to eq("stylesheets/view_component_test")
+      expect(StyleCapsule::StylesheetRegistry.request_stylesheet_files[:default]).not_to be_empty
+      expect(StyleCapsule::StylesheetRegistry.request_stylesheet_files[:default]["stylesheets/view_component_test"][:file_path]).to eq("stylesheets/view_component_test")
     end
 
     it "renders stylesheet tags via helper" do
@@ -410,9 +410,9 @@ RSpec.describe "StyleCapsule ViewComponent Integration", type: :integration do
         capsule_id: component.component_capsule
       )).to be true
 
-      # Should register file path in manifest
-      expect(StyleCapsule::StylesheetRegistry.manifest_files[:default]).not_to be_empty
-      file_path = StyleCapsule::StylesheetRegistry.manifest_files[:default].first[:file_path]
+      # Should register file path for the current request
+      expect(StyleCapsule::StylesheetRegistry.request_stylesheet_files[:default]).not_to be_empty
+      file_path = StyleCapsule::StylesheetRegistry.request_stylesheet_files[:default].values.first[:file_path]
       # File path uses capsule-{capsule_id} pattern (default filename pattern)
       expect(file_path).to include("capsule-")
     end

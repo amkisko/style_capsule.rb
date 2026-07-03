@@ -14,7 +14,7 @@ Gem::Specification.new do |spec|
   spec.license = "MIT"
 
   spec.files = Dir.chdir(File.expand_path(__dir__)) do
-    Dir["lib/**/*", "sig/**/*", "README.md", "LICENSE*", "CHANGELOG.md", "SECURITY.md"].select { |f| File.file?(f) }
+    Dir["lib/**/*", "sig/**/*", "docs/**/*.md", "README.md", "LICENSE*", "CHANGELOG.md", "SECURITY.md"].select { |f| File.file?(f) }
   end
   spec.files += Dir["lib/tasks/**/*.rake"]
   spec.require_paths = ["lib"]

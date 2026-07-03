@@ -134,19 +134,17 @@ RSpec.describe StyleCapsule::ViewComponentHelper do
     it "renders registered stylesheets and clears registry" do
       helper.register_stylesheet("stylesheets/my_component")
       helper.stylesheet_registry_tags
-      # File registrations persist in manifest (process-wide), so any? returns true
-      expect(StyleCapsule::StylesheetRegistry.any?).to be true
-      # But inline CSS should be cleared (request-scoped)
+      expect(StyleCapsule::StylesheetRegistry.any?).to be false
       expect(StyleCapsule::StylesheetRegistry.request_inline_stylesheets).to be_empty
+      expect(StyleCapsule::StylesheetRegistry.request_stylesheet_files).to be_empty
     end
 
     it "renders specific namespace" do
       helper.register_stylesheet("stylesheets/admin", namespace: :admin)
       helper.register_stylesheet("stylesheets/user", namespace: :user)
       helper.stylesheet_registry_tags(namespace: :admin)
-      # File registrations persist in manifest (process-wide)
-      expect(StyleCapsule::StylesheetRegistry.any?(namespace: :user)).to be true # User namespace should remain
-      expect(StyleCapsule::StylesheetRegistry.any?(namespace: :admin)).to be true # Admin should remain (manifest persists)
+      expect(StyleCapsule::StylesheetRegistry.any?(namespace: :user)).to be true
+      expect(StyleCapsule::StylesheetRegistry.any?(namespace: :admin)).to be false
     end
 
     it "passes namespace to render_head_stylesheets" do

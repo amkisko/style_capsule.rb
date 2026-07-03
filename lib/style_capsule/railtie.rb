@@ -4,6 +4,10 @@ module StyleCapsule
   # Railtie to automatically include StyleCapsule helpers in Rails
   if defined?(Rails::Railtie)
     class Railtie < Rails::Railtie
+      config.style_capsule = ActiveSupport::OrderedOptions.new
+      config.style_capsule.run_on_precompile = true
+      config.style_capsule.head_injection_middleware = true
+
       # Automatically include ERB helper in ActionView::Base (standard Rails pattern)
       # This makes helpers available in all ERB templates automatically
       ActiveSupport.on_load(:action_view) do
@@ -51,6 +55,13 @@ module StyleCapsule
       # Load rake tasks for CSS file building
       rake_tasks do
         load File.expand_path("../tasks/style_capsule.rake", __dir__)
+      end
+
+      initializer "style_capsule.head_injection_middleware", after: :load_config_initializers do |app|
+        next unless app.config.style_capsule.head_injection_middleware
+
+        require_relative "head_injection_middleware"
+        app.config.middleware.use StyleCapsule::HeadInjectionMiddleware
       end
 
       # Note: PhlexHelper should be included explicitly in ApplicationComponent

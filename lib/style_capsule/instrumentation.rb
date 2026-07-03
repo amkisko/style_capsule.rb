@@ -12,6 +12,7 @@ module StyleCapsule
   # @example Subscribing to CSS processing events
   #   ActiveSupport::Notifications.subscribe("style_capsule.css_processor.scope") do |name, start, finish, id, payload|
   #     duration_ms = (finish - start) * 1000
+  #     # input_size is derived from :css_content when subscribers exist
   #     input_size = payload[:input_size]
   #     Rails.logger.info "CSS scoped in #{duration_ms}ms, input: #{input_size} bytes"
   #   end
@@ -31,7 +32,7 @@ module StyleCapsule
     #
     # @return [Boolean]
     def self.available?
-      defined?(ActiveSupport::Notifications)
+      !!defined?(ActiveSupport::Notifications)
     end
 
     # Instrument an operation with automatic timing and size metrics
@@ -52,10 +53,11 @@ module StyleCapsule
     #     component_class: component_class.name,
     #     capsule_id: capsule_id,
     #     strategy: :selector_patching,
-    #     input_size: css_content.bytesize
+    #     css_content: css_content
     #   ) do
     #     CssProcessor.scope_selectors(css_content, capsule_id)
     #   end
+    #   # When subscribers exist, :input_size is set from :css_content before the block runs.
     def self.instrument(event_name, payload = {}, &block)
       return yield unless available?
 
@@ -115,23 +117,20 @@ module StyleCapsule
     # @param strategy [Symbol] Scoping strategy (:selector_patching or :nesting)
     # @param component_class [Class, String] Component class
     # @param capsule_id [String] Capsule ID
-    # @param css_content [String] CSS content (for size calculation)
+    # @param css_content [String] CSS content (`:input_size` derived lazily when subscribed)
     # @yield The CSS processing operation
     # @return [String] Processed CSS
     def self.instrument_css_processing(strategy:, component_class:, capsule_id:, css_content:, &block)
       component_name = component_class.is_a?(Class) ? component_class.name : component_class.to_s
-      input_size = css_content.bytesize
 
       instrument(
         "style_capsule.css_processor.scope",
         strategy: strategy,
         component_class: component_name,
         capsule_id: capsule_id,
-        input_size: input_size
+        css_content: css_content
       ) do
         result = yield
-        # Output size will be calculated by subscribers if needed
-        # They can access it via: result.bytesize
         result
       end
     end

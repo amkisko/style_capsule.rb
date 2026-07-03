@@ -2,9 +2,8 @@
 
 RSpec.describe StyleCapsule::Instrumentation do
   describe ".available?" do
-    it "returns true when ActiveSupport::Notifications is available" do
-      # available? checks defined?(ActiveSupport::Notifications)
-      expect(described_class.available?).to be_truthy
+    it "is true when ActiveSupport::Notifications is loaded" do
+      expect(described_class.available?).to eq(!!defined?(ActiveSupport::Notifications))
     end
   end
 

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "digest/sha1"
 require "tmpdir"
 require "fileutils"
 
@@ -115,10 +116,21 @@ RSpec.describe StyleCapsule::ViewComponent do
 
     it "caches scoped CSS per component class" do
       scope = component.component_capsule
-      scoped_css1 = component.send(:scope_css, component.component_styles)
-      scoped_css2 = component.send(:scope_css, component.component_styles)
+      css = component.component_styles
+      fp = Digest::SHA1.hexdigest(css.to_s)
+      scoped_css1 = component.send(:scope_css, css)
+      scoped_css2 = component.send(:scope_css, css)
       expect(scoped_css1).to eq(scoped_css2)
-      expect(component_class.css_cache).to have_key("#{component_class.name}:#{scope}:selector_patching")
+      expect(component_class.css_cache).to have_key("#{component_class.name}:#{scope}:selector_patching:#{fp}")
+    end
+
+    it "does not reuse cache when capsule id matches but CSS differs" do
+      component_class.capsule_id("shared-id")
+      a = component.send(:scope_css, ".a { color: red; }")
+      b = component.send(:scope_css, ".b { color: blue; }")
+      expect(a).to include(".a")
+      expect(b).to include(".b")
+      expect(a).not_to eq(b)
     end
 
     describe "css_scoping_strategy" do
@@ -152,15 +164,17 @@ RSpec.describe StyleCapsule::ViewComponent do
 
       it "caches scoped CSS separately for different strategies" do
         scope = component.component_capsule
+        css = component.component_styles
+        fp = Digest::SHA1.hexdigest(css.to_s)
 
         # First with selector_patching
-        scoped_css1 = component.send(:scope_css, component.component_styles)
-        expect(component_class.css_cache).to have_key("#{component_class.name}:#{scope}:selector_patching")
+        scoped_css1 = component.send(:scope_css, css)
+        expect(component_class.css_cache).to have_key("#{component_class.name}:#{scope}:selector_patching:#{fp}")
 
         # Then with nesting
         component_class.style_capsule scoping_strategy: :nesting
-        scoped_css2 = component.send(:scope_css, component.component_styles)
-        expect(component_class.css_cache).to have_key("#{component_class.name}:#{scope}:nesting")
+        scoped_css2 = component.send(:scope_css, css)
+        expect(component_class.css_cache).to have_key("#{component_class.name}:#{scope}:nesting:#{fp}")
 
         # Results should be different
         expect(scoped_css1).not_to eq(scoped_css2)
@@ -391,8 +405,7 @@ RSpec.describe StyleCapsule::ViewComponent do
 
       expect(output).to include("<style")
       expect(output).to include("text/css")
-      # Inline CSS is registered for head rendering, so registry has content
-      expect(StyleCapsule::StylesheetRegistry.any?).to be true
+      expect(StyleCapsule::StylesheetRegistry.any?).to be false
     end
 
     describe ".stylesheet_link_options" do

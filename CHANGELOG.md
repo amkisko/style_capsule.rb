@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## Unreleased
+
+## 2.0.0 (2026-07-03)
+
+- BREAKING: split `StylesheetRegistry.register` into request-scoped `register` and boot-time `register_eager`
+  - Replace boot-time `StylesheetRegistry.register(...)` with `register_eager(...)`; keep `register` for render-time / `register_stylesheet` paths
+- BREAKING: enable `StyleCapsule::HeadInjectionMiddleware` by default (`config.style_capsule.head_injection_middleware`); set to `false` to disable
+- Fix render-time `register_stylesheet` missing from `<head>` on the same request when layouts render head before body
+- Add `HeadInjectionMiddleware` to inject pending stylesheet tags before `</head>` after the response body is rendered
+  - Skips chunked responses and only buffers when pending request-scoped stylesheets exist; accepts any 2xx HTML response
+- Dedupe eager manifest and request-scoped file paths by logical path when rendering `<head>` (request registration wins on option conflicts)
+- Bound class-level component CSS cache (`MAX_CSS_CACHE_ENTRIES` = 256)
+- Single-pass `<style>` extraction in ERB / standalone helpers (`StringScanner`)
+- Reject parent path segments (`..`) in `AssetPath.validate_logical_path!`
+- Add `StyleCapsule::StylesheetRegistry.inject_pending_head_stylesheets` for manual/testing use
+- Extract shared Phlex / ViewComponent class DSL into `StyleCapsule::ComponentClassMethods`
+- Fix class-level `scope_css` cache keys to include a CSS fingerprint (instance methods returning different styles per render)
+- Fix ERB / standalone `Helper#scope_css` thread cache keys to include a CSS fingerprint
+- Add `tag:` option to `StandaloneHelper#style_capsule` (aligned with the Rails helper)
+- Fix `PhlexHelper#stylesheet_registry_tags` to always return a string when `safe` is unavailable
+- Pass `component_class:` into `CssProcessor` from `ViewComponent` for consistent instrumentation
+- Defer `input_size` in `Instrumentation.instrument_css_processing` until instrumentation runs
+- Documentation: add [docs/non_rails_support.md](docs/non_rails_support.md); document late head injection, `register_eager`, streaming / Live caveats
+- RBS: `StylesheetRegistry` no longer declared as a subclass of `ActiveSupport::CurrentAttributes` only
+
 ## 1.4.0 (2025-11-26)
 
 - Added unified `style_capsule` class method for configuring all StyleCapsule settings (namespace, cache strategy, CSS scoping, head rendering) in a single call

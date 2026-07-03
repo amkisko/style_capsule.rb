@@ -75,6 +75,8 @@ module StyleCapsule
     DEFAULT_OUTPUT_DIR = "app/assets/builds/capsules"
     # Fallback directory for when default location is read-only (absolute path)
     FALLBACK_OUTPUT_DIR = "/tmp/style_capsule"
+    # Positive cache for resolved asset-relative paths (avoids repeated File.exist? on hot path)
+    FILE_PATH_CACHE_MAX = 512
 
     class << self
       attr_accessor :output_dir, :filename_pattern, :enabled, :fallback_dir
@@ -99,6 +101,7 @@ module StyleCapsule
       #     filename_pattern: ->(klass, capsule) { "#{klass.name.underscore}-#{capsule}.css" }
       #   )
       def configure(output_dir: nil, filename_pattern: nil, enabled: true, fallback_dir: nil)
+        clear_file_path_hit_cache!
         @enabled = enabled
 
         @output_dir = if output_dir
@@ -194,12 +197,9 @@ module StyleCapsule
         # Return relative path for stylesheet_link_tag
         # Path should be relative to app/assets
         # Handle case where output directory is not under rails_assets_root (e.g., in tests)
-        begin
-          file_path.relative_path_from(rails_assets_root).to_s.gsub(/\.css$/, "")
-        rescue ArgumentError
-          # If paths don't share a common prefix (e.g., in tests), return just the filename
-          filename.gsub(/\.css$/, "")
-        end
+        rel = asset_logical_path(file_path, filename)
+        remember_file_path_hit("#{component_class.name}:#{capsule_id}", rel)
+        rel
       end
 
       # Check if file exists for given component and capsule
@@ -223,6 +223,10 @@ module StyleCapsule
       def file_path_for(component_class:, capsule_id:)
         return nil unless enabled?
 
+        cache_key = "#{component_class.name}:#{capsule_id}"
+        hit = file_path_hit_cache_mutex.synchronize { file_path_hit_cache[cache_key] }
+        return hit if hit
+
         filename = generate_filename(component_class, capsule_id)
         file_path = output_directory.join(filename)
 
@@ -230,12 +234,9 @@ module StyleCapsule
 
         # Return relative path for stylesheet_link_tag
         # Handle case where output directory is not under rails_assets_root (e.g., in tests)
-        begin
-          file_path.relative_path_from(rails_assets_root).to_s.gsub(/\.css$/, "")
-        rescue ArgumentError
-          # If paths don't share a common prefix (e.g., in tests), return just the filename
-          filename.gsub(/\.css$/, "")
-        end
+        rel = asset_logical_path(file_path, filename)
+        remember_file_path_hit(cache_key, rel)
+        rel
       end
 
       # Ensure output directory exists
@@ -264,6 +265,7 @@ module StyleCapsule
       def clear_files
         return unless enabled?
 
+        clear_file_path_hit_cache!
         dir = output_directory
         return unless Dir.exist?(dir)
 
@@ -284,6 +286,39 @@ module StyleCapsule
       end
 
       private
+
+      def file_path_hit_cache
+        @file_path_hit_cache ||= {}
+      end
+
+      def file_path_hit_cache_mutex
+        @file_path_hit_cache_mutex ||= Mutex.new
+      end
+
+      def remember_file_path_hit(cache_key, relative_path)
+        file_path_hit_cache_mutex.synchronize do
+          file_path_hit_cache[cache_key] = relative_path
+          while file_path_hit_cache.size > FILE_PATH_CACHE_MAX
+            file_path_hit_cache.shift
+          end
+        end
+      end
+
+      def clear_file_path_hit_cache!
+        file_path_hit_cache_mutex.synchronize do
+          file_path_hit_cache.clear
+        end
+      end
+
+      # Logical path for stylesheet_link_tag (no parent segments; safe for AssetPath validation)
+      def asset_logical_path(file_path, filename)
+        candidate = file_path.relative_path_from(rails_assets_root).to_s.gsub(/\.css$/, "")
+        return candidate unless candidate.split("/").any? { |segment| segment == ".." }
+
+        filename.gsub(/\.css$/, "")
+      rescue ArgumentError
+        filename.gsub(/\.css$/, "")
+      end
 
       # Get output directory (with default)
       def output_directory

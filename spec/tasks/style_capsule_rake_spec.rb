@@ -460,13 +460,11 @@ RSpec.describe "style_capsule rake tasks" do
       # Verify that assets:precompile task exists
       expect(Rake::Task.task_defined?("assets:precompile")).to be true
 
-      # Verify that style_capsule:build is in the prerequisites
-      # The enhance method adds prerequisites, so we check if style_capsule:build is a prerequisite
+      # The enhance method adds style_capsule:precompile_hook (which runs build when enabled)
       assets_task = Rake::Task["assets:precompile"]
       prerequisites = assets_task.prerequisites
 
-      # The enhance method adds style_capsule:build as a prerequisite
-      expect(prerequisites).to include("style_capsule:build")
+      expect(prerequisites).to include("style_capsule:precompile_hook")
 
       # Clean up
       Rake::Task["assets:precompile"].clear if Rake::Task.task_defined?("assets:precompile")

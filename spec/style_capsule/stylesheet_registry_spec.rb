@@ -2,7 +2,7 @@
 
 RSpec.describe StyleCapsule::StylesheetRegistry do
   before do
-    # Clear both request-scoped inline CSS and process-wide manifest
+    # Clear both request-scoped inline CSS, request-scoped files, and process-wide manifest
     described_class.clear
     described_class.clear_manifest
   end
@@ -22,6 +22,15 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
 
     it "normalizes string to symbol" do
       expect(described_class.normalize_namespace("admin")).to eq(:admin)
+    end
+  end
+
+  describe ".register_eager" do
+    it "registers a stylesheet file in the process-wide manifest" do
+      described_class.register_eager("stylesheets/my_component")
+      stylesheets = described_class.stylesheets_for
+      expect(stylesheets.length).to eq(1)
+      expect(stylesheets.first[:file_path]).to eq("stylesheets/my_component")
     end
   end
 
@@ -85,32 +94,30 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
   end
 
   describe ".clear" do
-    it "clears only request-scoped inline CSS, not process-wide manifest" do
-      described_class.register("stylesheets/one")
+    it "clears request-scoped inline CSS and files, not the process-wide manifest" do
+      described_class.register_eager("stylesheets/one")
+      described_class.register("stylesheets/two")
       described_class.register_inline(".inline { color: red; }")
       described_class.clear
-      # File should still be in manifest
       expect(described_class.stylesheets_for.length).to eq(1)
       expect(described_class.stylesheets_for.first[:file_path]).to eq("stylesheets/one")
-      # Inline CSS should be cleared
       expect(described_class.request_inline_stylesheets).to be_empty
+      expect(described_class.request_stylesheet_files).to be_empty
     end
 
-    it "clears only specific namespace inline CSS" do
-      described_class.register("stylesheets/one")
+    it "clears only specific namespace request-scoped state" do
+      described_class.register_eager("stylesheets/one")
       described_class.register_inline(".inline { color: red; }", namespace: :admin)
       described_class.clear(namespace: :admin)
-      # File should still be in manifest
       expect(described_class.stylesheets_for.length).to eq(1)
-      # Inline CSS should be cleared
       expect(described_class.request_inline_stylesheets[:admin]).to be_nil
     end
   end
 
   describe ".clear_manifest" do
     it "clears process-wide manifest" do
-      described_class.register("stylesheets/one")
-      described_class.register("stylesheets/two", namespace: :admin)
+      described_class.register_eager("stylesheets/one")
+      described_class.register_eager("stylesheets/two", namespace: :admin)
       expect(described_class.manifest_files[:default]).not_to be_empty
       expect(described_class.manifest_files[:admin]).not_to be_empty
 
@@ -119,8 +126,8 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
     end
 
     it "clears only specific namespace from manifest" do
-      described_class.register("stylesheets/one")
-      described_class.register("stylesheets/two", namespace: :admin)
+      described_class.register_eager("stylesheets/one")
+      described_class.register_eager("stylesheets/two", namespace: :admin)
       described_class.clear_manifest(namespace: :admin)
       expect(described_class.manifest_files[:default]).not_to be_empty
       expect(described_class.manifest_files[:admin]).to be_nil
@@ -128,21 +135,37 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
   end
 
   describe "process-wide manifest behavior" do
-    it "persists file registrations across clear calls" do
-      described_class.register("stylesheets/persistent")
+    it "persists eager file registrations across clear calls" do
+      described_class.register_eager("stylesheets/persistent")
       expect(described_class.stylesheets_for.length).to eq(1)
 
-      # Clear request-scoped inline CSS (should not affect manifest)
       described_class.clear
       expect(described_class.stylesheets_for.length).to eq(1)
       expect(described_class.stylesheets_for.first[:file_path]).to eq("stylesheets/persistent")
     end
 
-    it "deduplicates file registrations in manifest" do
-      described_class.register("stylesheets/duplicate")
-      described_class.register("stylesheets/duplicate")
-      # Should only have one entry (Set deduplicates)
+    it "deduplicates eager file registrations in manifest" do
+      described_class.register_eager("stylesheets/duplicate")
+      described_class.register_eager("stylesheets/duplicate")
       expect(described_class.manifest_files[:default].length).to eq(1)
+    end
+
+    it "replaces options when the same eager path is registered again (last wins)" do
+      described_class.register_eager("stylesheets/one", "data-turbo-track": "reload")
+      described_class.register_eager("stylesheets/one", media: "print")
+      entry = described_class.stylesheets_for.first
+      expect(entry[:options]).to eq({media: "print"})
+    end
+
+    it "deduplicates when the same path is eager and request-registered (request wins)" do
+      described_class.register_eager("stylesheets/one", "data-turbo-track": "reload")
+      described_class.register("stylesheets/one", media: "print")
+
+      stylesheets = described_class.stylesheets_for
+      file_stylesheets = stylesheets.reject { |s| s[:type] == :inline }
+
+      expect(file_stylesheets.length).to eq(1)
+      expect(file_stylesheets.first[:options]).to eq({media: "print"})
     end
   end
 
@@ -176,10 +199,9 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
         described_class.register("stylesheets/my_component")
         result = described_class.render_head_stylesheets(view_context)
         expect(result).to include("stylesheet")
-        # File registrations persist in manifest (process-wide), so any? returns true
-        expect(described_class.any?).to be true
-        # But inline CSS should be cleared (request-scoped)
+        expect(described_class.any?).to be false
         expect(described_class.request_inline_stylesheets).to be_empty
+        expect(described_class.request_stylesheet_files).to be_empty
       end
 
       it "renders inline stylesheets" do
@@ -274,6 +296,46 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
 
       described_class.clear_inline_cache
       expect(described_class.instance_variable_get(:@inline_cache)).to be_empty
+    end
+  end
+
+  describe ".inject_pending_head_stylesheets" do
+    let(:html) { "<html><head><title>Test</title></head><body></body></html>" }
+
+    it "injects pending request-scoped stylesheets before </head>" do
+      described_class.register("stylesheets/user/order_history_component", namespace: :user)
+
+      result = described_class.inject_pending_head_stylesheets(html, nil)
+
+      expect(result).to include("/assets/stylesheets/user/order_history_component.css")
+      expect(result.index("/assets/stylesheets/user/order_history_component.css")).to be < result.index("<body>")
+      expect(described_class.any?).to be false
+    end
+
+    it "returns the original html when nothing is pending" do
+      result = described_class.inject_pending_head_stylesheets(html, nil)
+      expect(result).to eq(html)
+    end
+
+    it "injects pending inline CSS before </head>" do
+      described_class.register_inline(".pending { color: green; }", namespace: :user)
+
+      result = described_class.inject_pending_head_stylesheets(html, nil)
+
+      expect(result).to include(".pending { color: green; }")
+      expect(result.index("<style")).to be < result.index("<body>")
+    end
+  end
+
+  describe ".pending_head_stylesheets?" do
+    it "is false when only eager manifest entries exist" do
+      described_class.register_eager("stylesheets/main")
+      expect(described_class.pending_head_stylesheets?).to be false
+    end
+
+    it "is true when request-scoped file paths remain" do
+      described_class.register("stylesheets/page")
+      expect(described_class.pending_head_stylesheets?).to be true
     end
   end
 

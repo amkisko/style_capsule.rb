@@ -89,6 +89,15 @@ RSpec.describe StyleCapsule::Helper do
       result2 = helper.scope_css(css, capsule_id)
       expect(result1).to eq(result2)
     end
+
+    it "does not reuse cache when capsule_id matches but CSS differs" do
+      capsule_id = "shared-id"
+      a = helper.scope_css(".a { color: red; }", capsule_id)
+      b = helper.scope_css(".b { color: blue; }", capsule_id)
+      expect(a).to include(".a")
+      expect(b).to include(".b")
+      expect(a).not_to eq(b)
+    end
   end
 
   describe "#style_capsule" do
@@ -107,6 +116,34 @@ RSpec.describe StyleCapsule::Helper do
         expect(result).to include("[data-capsule=")
         expect(result).to include('class="section"')
         expect(result).to include("Content")
+      end
+
+      it "extracts and scopes multiple style blocks into one scoped stylesheet" do
+        result = helper.style_capsule(capsule_id: "multi-test") do
+          <<~HTML
+            <style>.a { color: red; }</style>
+            <style>.b { color: blue; }</style>
+            <div class="a">A</div>
+          HTML
+        end
+
+        expect(result.scan("<style").length).to eq(1)
+        expect(result).to include('[data-capsule="multi-test"]')
+        expect(result).to include(".a")
+        expect(result).to include(".b")
+        expect(result).not_to include("<style>.a")
+      end
+
+      it "extracts many style blocks in document order" do
+        styles = 20.times.map { |i| "<style>.r#{i} { color: red; }</style>" }.join
+        result = helper.style_capsule(capsule_id: "many-styles") do
+          "#{styles}<div>content</div>"
+        end
+
+        expect(result.scan("<style").length).to eq(1)
+        20.times do |i|
+          expect(result).to include(".r#{i}")
+        end
       end
     end
 
@@ -185,10 +222,9 @@ RSpec.describe StyleCapsule::Helper do
       helper.register_stylesheet("stylesheets/my_component")
       result = helper.stylesheet_registry_tags
       expect(result).to be_a(String)
-      # File registrations persist in manifest (process-wide), so any? returns true
-      expect(StyleCapsule::StylesheetRegistry.any?).to be true
-      # But inline CSS should be cleared (request-scoped)
+      expect(StyleCapsule::StylesheetRegistry.any?).to be false
       expect(StyleCapsule::StylesheetRegistry.request_inline_stylesheets).to be_empty
+      expect(StyleCapsule::StylesheetRegistry.request_stylesheet_files).to be_empty
     end
 
     it "renders specific namespace" do
@@ -196,7 +232,8 @@ RSpec.describe StyleCapsule::Helper do
       helper.register_stylesheet("stylesheets/user", namespace: :user)
       result = helper.stylesheet_registry_tags(namespace: :admin)
       expect(result).to be_a(String)
-      expect(StyleCapsule::StylesheetRegistry.any?(namespace: :user)).to be true # User namespace should remain
+      expect(StyleCapsule::StylesheetRegistry.any?(namespace: :user)).to be true
+      expect(StyleCapsule::StylesheetRegistry.any?(namespace: :admin)).to be false
     end
 
     it "handles empty namespace string" do

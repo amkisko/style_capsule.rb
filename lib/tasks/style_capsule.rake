@@ -16,7 +16,20 @@ namespace :style_capsule do
   end
 end
 
-# Hook into Rails asset precompilation (similar to Tailwind CSS)
+# Hook into Rails asset precompilation (similar to Tailwind CSS).
+# Set `config.style_capsule.run_on_precompile = false` to skip.
+task "style_capsule:precompile_hook" => :environment do
+  cfg = Rails.application.config
+  run = if cfg.respond_to?(:style_capsule) && cfg.style_capsule
+    cfg.style_capsule.run_on_precompile != false
+  else
+    true
+  end
+  next unless run
+
+  Rake::Task["style_capsule:build"].invoke
+end
+
 if defined?(Rails)
-  Rake::Task["assets:precompile"].enhance(["style_capsule:build"]) if Rake::Task.task_defined?("assets:precompile")
+  Rake::Task["assets:precompile"].enhance(["style_capsule:precompile_hook"]) if Rake::Task.task_defined?("assets:precompile")
 end

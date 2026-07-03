@@ -1,14 +1,8 @@
 # style_capsule
 
-[![Gem Version](https://badge.fury.io/rb/style_capsule.svg?v=1.4.0)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/amkisko/style_capsule.rb/graph/badge.svg?token=2U6NXJOVVM)](https://codecov.io/gh/amkisko/style_capsule.rb)
+[![Gem Version](https://badge.fury.io/rb/style_capsule.svg?v=2.0.0)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/amkisko/style_capsule.rb/graph/badge.svg?token=2U6NXJOVVM)](https://codecov.io/gh/amkisko/style_capsule.rb)
 
 CSS scoping extension for Ruby components. Provides attribute-based style encapsulation for Phlex, ViewComponent, and ERB templates to prevent style leakage between components. Works with Rails and can be used standalone in other Ruby frameworks (Sinatra, Hanami, etc.) or plain Ruby scripts. Includes configurable caching strategies for optimal performance.
-
-Sponsored by [Kisko Labs](https://www.kiskolabs.com).
-
-<a href="https://www.kiskolabs.com">
-  <img src="kisko.svg" width="200" alt="Sponsored by Kisko Labs" />
-</a>
 
 ## Installation
 
@@ -249,6 +243,21 @@ end
 
 Registered files are rendered via `stylesheet_registry_tags` in your layout, just like inline CSS. The namespace is automatically used from the component's `style_capsule` configuration when not explicitly specified.
 
+**Boot-time file paths:** register static paths once with `StyleCapsule::StylesheetRegistry.register_eager(...)` (initializers, class load). Use `register` / `register_stylesheet` during rendering for request-scoped paths.
+
+### Late head injection (Rails)
+
+Layouts usually call `stylesheet_registry_tags` in `<head>` before the body renders. Components that call `register_stylesheet` later in the same response would miss that call without help.
+
+By default, `StyleCapsule::HeadInjectionMiddleware` appends pending request-scoped stylesheet tags immediately before `</head>` after the response body is built. Disable when you buffer or stream the body yourself:
+
+```ruby
+# config/application.rb
+config.style_capsule.head_injection_middleware = false
+```
+
+The middleware skips chunked responses (`Transfer-Encoding: chunked`) and does not buffer the body when no pending request-scoped stylesheets remain. For ActionController::Live, SSE, or other streaming HTML, disable it and inject manually with `StyleCapsule::StylesheetRegistry.inject_pending_head_stylesheets` if needed.
+
 ## Caching Strategies
 
 ### No Caching (Default)
@@ -451,79 +460,9 @@ end
 
 ## Non-Rails Support
 
-StyleCapsule can be used without Rails! The core functionality is framework-agnostic.
+The core library is framework-agnostic. Without Rails, use `StyleCapsule::CssProcessor` directly, `StyleCapsule::Component` with Phlex, or `StyleCapsule::StandaloneHelper` for ERB-style templates. The stylesheet registry falls back to thread-local storage when `ActiveSupport::CurrentAttributes` is not loaded.
 
-### Standalone Usage
-
-```ruby
-require 'style_capsule'
-
-# Direct CSS processing
-css = ".section { color: red; }"
-capsule_id = "abc123"
-scoped = StyleCapsule::CssProcessor.scope_selectors(css, capsule_id)
-# => "[data-capsule=\"abc123\"] .section { color: red; }"
-```
-
-### Phlex Without Rails
-
-```ruby
-require 'phlex'
-require 'style_capsule'
-
-class MyComponent < Phlex::HTML
-  include StyleCapsule::Component
-  
-  def component_styles
-    <<~CSS
-      .section { color: red; }
-    CSS
-  end
-  
-  def view_template
-    div(class: "section") { "Hello" }
-  end
-end
-```
-
-### Sinatra
-
-```ruby
-require 'sinatra'
-require 'style_capsule'
-
-class MyApp < Sinatra::Base
-  helpers StyleCapsule::StandaloneHelper
-  
-  get '/' do
-    erb :index
-  end
-end
-```
-
-```erb
-<!-- views/index.erb -->
-<%= style_capsule do %>
-  <style>
-    .section { color: red; }
-  </style>
-  <div class="section">Content</div>
-<% end %>
-```
-
-### Stylesheet Registry Without Rails
-
-The stylesheet registry automatically uses thread-local storage when ActiveSupport is not available:
-
-```ruby
-require 'style_capsule'
-
-# Works without Rails
-StyleCapsule::StylesheetRegistry.register_inline(".test { color: red; }", namespace: :test)
-stylesheets = StyleCapsule::StylesheetRegistry.request_inline_stylesheets
-```
-
-For more details, see [docs/non_rails_support.md](docs/non_rails_support.md).
+For setup examples, API notes, and the relationship between `style_capsule` and `stylesheet_registry`, see **[docs/non_rails_support.md](docs/non_rails_support.md)**.
 
 ## How It Works
 
@@ -583,3 +522,11 @@ For detailed security information, see [SECURITY.md](SECURITY.md).
 ## License
 
 The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
+
+## Sponsors
+
+Sponsored by [Kisko Labs](https://www.kiskolabs.com).
+
+<a href="https://www.kiskolabs.com">
+  <img src="kisko.svg" width="200" alt="Sponsored by Kisko Labs" />
+</a>

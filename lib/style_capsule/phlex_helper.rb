@@ -16,7 +16,7 @@ module StyleCapsule
   # Usage in Phlex components:
   #   class MyComponent < ApplicationComponent
   #     include StyleCapsule::PhlexHelper
-  #     styles_namespace :user  # Set default namespace
+  #     style_capsule namespace: :user  # Set default namespace for register_stylesheet
   #
   #     def view_template
   #       register_stylesheet("stylesheets/user/my_component")  # Uses :user namespace automatically
@@ -33,7 +33,7 @@ module StyleCapsule
     #     div { "Content" }
     #   end
     #
-    # If the component has a default namespace set via styles_namespace or stylesheet_registry,
+    # If the component has a default namespace set via style_capsule or stylesheet_registry,
     # it will be used automatically when namespace is not explicitly provided.
     #
     # @param file_path [String] Path to stylesheet (relative to app/assets/stylesheets)
@@ -60,18 +60,13 @@ module StyleCapsule
     # @return [void] Renders stylesheet tags via raw
     def stylesheet_registry_tags(namespace: nil)
       output = StyleCapsule::StylesheetRegistry.render_head_stylesheets(view_context, namespace: namespace)
-      # Phlex's raw() requires the object to be marked as safe
-      # Use Phlex's safe() if available, otherwise fall back to html_safe for test doubles
-      # The output from render_head_stylesheets is already html_safe (SafeBuffer)
       output_string = output.to_s
 
       if respond_to?(:safe)
-        # Real Phlex component - use raw() for rendering
-        safe_content = safe(output_string)
-        raw(safe_content)
+        raw(safe(output_string))
       end
 
-      # Always return the output string for testing/compatibility
+      # Phlex `raw` may return nil when writing to the buffer; callers/tests expect the HTML string.
       output_string
     end
   end

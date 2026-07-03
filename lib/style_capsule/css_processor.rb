@@ -61,8 +61,8 @@ module StyleCapsule
         css = css_string.dup
         capsule_attr = %([data-capsule="#{capsule_id}"])
 
-        # Strip CSS comments to avoid interference with selector matching
-        # Simple approach: remove /* ... */ comments (including multi-line)
+        # Strip CSS comments so they do not interfere with selector matching.
+        # Comments are removed from the output (typical for production CSS).
         css_without_comments = strip_comments(css)
 
         # Process CSS rule by rule
@@ -108,10 +108,6 @@ module StyleCapsule
           "#{prefix}#{whitespace}#{scoped_selectors}#{opening_brace}"
         end
 
-        # Restore comments in their original positions
-        # Since we stripped comments, we need to put them back
-        # For simplicity, we'll just return the processed CSS without comments
-        # (comments are typically removed in production CSS anyway)
         css_without_comments
       end
     end

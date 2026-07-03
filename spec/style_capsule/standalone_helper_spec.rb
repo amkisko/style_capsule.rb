@@ -68,6 +68,15 @@ RSpec.describe StyleCapsule::StandaloneHelper do
 
       expect(scoped1).to eq(scoped2)
     end
+
+    it "does not reuse cache when capsule_id matches but CSS differs" do
+      capsule_id = "shared-id"
+      a = helper.scope_css(".a { color: red; }", capsule_id)
+      b = helper.scope_css(".b { color: blue; }", capsule_id)
+      expect(a).to include(".a")
+      expect(b).to include(".b")
+      expect(a).not_to eq(b)
+    end
   end
 
   describe "#content_tag" do
@@ -206,6 +215,15 @@ RSpec.describe StyleCapsule::StandaloneHelper do
         result = helper.style_capsule(css, capsule_id: "test123")
 
         expect(result).to include('[data-capsule="test123"]')
+      end
+
+      it "wraps with a custom tag" do
+        css = ".section { color: red; }"
+        result = helper.style_capsule(css, tag: :section) { "<div class='section'>Content</div>" }
+
+        expect(result).to include("<section")
+        expect(result).to include("data-capsule")
+        expect(result).to include("Content")
       end
     end
 

@@ -184,8 +184,8 @@ puts "Example 6: Stylesheet Registry (Non-Rails)"
 puts "=" * 80
 
 # Register stylesheets
-StyleCapsule::StylesheetRegistry.register("stylesheets/main", namespace: :default)
-StyleCapsule::StylesheetRegistry.register("stylesheets/admin", namespace: :admin)
+StyleCapsule::StylesheetRegistry.register_eager("stylesheets/main", namespace: :default)
+StyleCapsule::StylesheetRegistry.register_eager("stylesheets/admin", namespace: :admin)
 
 # Render stylesheets
 class HeadRenderer

@@ -14,6 +14,11 @@ if defined?(StyleCapsule::Railtie)
         expect(described_class).to be < Rails::Railtie
       end
 
+      it "registers config.style_capsule with run_on_precompile defaulting to true" do
+        expect(Rails.application.config.style_capsule).to be_a(ActiveSupport::OrderedOptions)
+        expect(Rails.application.config.style_capsule.run_on_precompile).to be true
+      end
+
       describe "after_initialize callback" do
         it "configures CSS file writer with Rails root" do
           # Trigger the after_initialize callback

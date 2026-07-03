@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require_relative "instrumentation"
+require_relative "asset_path"
+
 module StyleCapsule
   # Helper to determine the parent class for StylesheetRegistry
   # ActiveSupport::CurrentAttributes is optional - if ActiveSupport is loaded,
@@ -13,10 +16,13 @@ module StyleCapsule
 
   # Hybrid registry for stylesheet files that need to be injected into <head>
   #
-  # Uses a process-wide manifest for static file paths (like Propshaft) and request-scoped
-  # storage for inline CSS. This approach:
-  # - Collects static file paths once per process (no rebuilding on each request)
-  # - Stores inline CSS per-request (since it's component-specific)
+  # Uses a process-wide manifest for eager registrations, request-scoped storage for
+  # render-time file paths and inline CSS, and optional Rack middleware to inject
+  # stylesheets registered during body rendering into +<head>+ on the same request.
+  #
+  # This approach:
+  # - Keeps eager file paths in a process-wide manifest (class load / boot time)
+  # - Stores render-time file paths and inline CSS per request
   # - Works correctly with both threaded and forked web servers (Puma, Unicorn, etc.)
   #
   # Supports namespaces for separation of stylesheets (e.g., "admin", "user", "public").
@@ -33,8 +39,11 @@ module StyleCapsule
   #     end
   #   end
   #
-  # @example Register a stylesheet file manually (default namespace)
+  # @example Register a stylesheet during rendering (request-scoped)
   #   StyleCapsule::StylesheetRegistry.register('stylesheets/my_component')
+  #
+  # @example Register a stylesheet eagerly at boot or class load (process-wide manifest)
+  #   StyleCapsule::StylesheetRegistry.register_eager('stylesheets/my_component', namespace: :user)
   #
   # @example Register a stylesheet with a namespace
   #   StyleCapsule::StylesheetRegistry.register('stylesheets/admin/dashboard', namespace: :admin)
@@ -65,20 +74,21 @@ module StyleCapsule
     DEFAULT_NAMESPACE = :default
 
     # Process-wide manifest for static file paths (like Propshaft)
-    # Organized by namespace: { namespace => Set of {file_path, options} hashes }
-    @manifest = {} # rubocop:disable Style/ClassVars
+    # Organized by namespace: { namespace => { logical_path => { file_path:, options: } } }
+    @manifest = {} # rubocop:disable Style/ClassVars, ThreadSafety/MutableClassInstanceVariable
 
     # Process-wide cache for inline CSS (with expiration support)
     # Structure: { cache_key => { css_content: String, cached_at: Time, expires_at: Time } }
-    @inline_cache = {} # rubocop:disable Style/ClassVars
+    @inline_cache = {} # rubocop:disable Style/ClassVars, ThreadSafety/MutableClassInstanceVariable
 
     # Track last cleanup time for lazy cleanup (prevents excessive cleanup calls)
     @last_cleanup_time = nil # rubocop:disable Style/ClassVars
 
-    # Request-scoped storage for inline CSS only
+    # Request-scoped storage for inline CSS and render-time file registrations
     # Only define attribute if we're inheriting from CurrentAttributes
     if defined?(ActiveSupport::CurrentAttributes) && self < ActiveSupport::CurrentAttributes
       attribute :inline_stylesheets
+      attribute :request_file_stylesheets
     end
 
     class << self
@@ -125,19 +135,41 @@ module StyleCapsule
         end
       end
 
+      # Get request-scoped file stylesheets (thread-local fallback if not using CurrentAttributes)
+      def request_file_stylesheets
+        if using_current_attributes?
+          inst = instance
+          inst&.request_file_stylesheets || {}
+        else
+          Thread.current[:style_capsule_request_file_stylesheets] ||= {}
+        end
+      end
+
+      # Set request-scoped file stylesheets (thread-local fallback if not using CurrentAttributes)
+      def request_file_stylesheets=(value)
+        if using_current_attributes?
+          inst = instance
+          inst.request_file_stylesheets = value if inst
+        else
+          Thread.current[:style_capsule_request_file_stylesheets] = value
+        end
+      end
+
       # Get instance (for CurrentAttributes compatibility)
       def instance
         if using_current_attributes?
           # Call the CurrentAttributes instance method from parent class
           super
         else
-          # Return a simple object that responds to inline_stylesheets
+          # Return a simple object that responds to request-scoped attributes
           # This is mainly for compatibility with code that might call instance.inline_stylesheets
           registry_class = self
           @_standalone_instance ||= begin
             obj = Object.new
             obj.define_singleton_method(:inline_stylesheets) { registry_class.inline_stylesheets }
             obj.define_singleton_method(:inline_stylesheets=) { |v| registry_class.inline_stylesheets = v }
+            obj.define_singleton_method(:request_file_stylesheets) { registry_class.request_file_stylesheets }
+            obj.define_singleton_method(:request_file_stylesheets=) { |v| registry_class.request_file_stylesheets = v }
             obj
           end
         end
@@ -155,32 +187,64 @@ module StyleCapsule
       namespace.to_sym
     end
 
-    # Register a stylesheet file path for head rendering
+    # Register a stylesheet file path during rendering (request-scoped).
     #
-    # Static file paths are stored in process-wide manifest (collected once per process).
-    # This is similar to Propshaft's manifest approach - files are static, so we can
-    # collect them process-wide without rebuilding on each request.
+    # Render-time registrations are stored per request and emitted by
+    # +render_head_stylesheets+ when the layout head runs before the body, or by
+    # +HeadInjectionMiddleware+ when components register stylesheets later in the response.
     #
     # Files registered here are served through Rails asset pipeline (via stylesheet_link_tag).
-    # This includes both:
-    # - Pre-built files from assets:precompile (already in asset pipeline)
-    # - Dynamically written files (written during runtime, also served through asset pipeline)
-    #
-    # The Set automatically deduplicates entries, so registering the same file multiple times
-    # (e.g., when the same component renders multiple times) is safe and efficient.
     #
     # @param file_path [String] Path to stylesheet (relative to app/assets/stylesheets)
     # @param namespace [Symbol, String, nil] Optional namespace for separation (nil/blank uses default)
     # @param options [Hash] Options for stylesheet_link_tag
     # @return [void]
     def self.register(file_path, namespace: nil, **options)
-      ns = normalize_namespace(namespace)
-      @manifest[ns] ||= Set.new
-      # Use a hash with file_path and options as the key to avoid duplicates
-      # Set will automatically deduplicate based on hash equality
-      entry = {file_path: file_path, options: options}
-      @manifest[ns] << entry
+      register_request_file(file_path, namespace: namespace, **options)
     end
+
+    # Register a stylesheet file path eagerly (process-wide manifest).
+    #
+    # Use at class load or boot time when the stylesheet should always be available in
+    # +render_head_stylesheets+ without waiting for a component render.
+    #
+    # @param file_path [String] Path to stylesheet (relative to app/assets/stylesheets)
+    # @param namespace [Symbol, String, nil] Optional namespace for separation (nil/blank uses default)
+    # @param options [Hash] Options for stylesheet_link_tag
+    # @return [void]
+    def self.register_eager(file_path, namespace: nil, **options)
+      ns = normalize_namespace(namespace)
+      path = AssetPath.validate_logical_path!(file_path)
+
+      Instrumentation.instrument_registration(
+        namespace: ns,
+        file_path: path,
+        inline_size: nil,
+        cache_strategy: :none
+      ) do
+        @manifest[ns] ||= {}
+        @manifest[ns][path] = {file_path: path, options: options}
+      end
+    end
+
+    # @api private
+    def self.register_request_file(file_path, namespace: nil, **options)
+      ns = normalize_namespace(namespace)
+      path = AssetPath.validate_logical_path!(file_path)
+
+      Instrumentation.instrument_registration(
+        namespace: ns,
+        file_path: path,
+        inline_size: nil,
+        cache_strategy: :none
+      ) do
+        registry = request_file_stylesheets
+        registry[ns] ||= {}
+        registry[ns][path] = {file_path: path, options: options}
+        self.request_file_stylesheets = registry
+      end
+    end
+    private_class_method :register_request_file
 
     # Register inline CSS for head rendering
     #
@@ -215,7 +279,7 @@ module StyleCapsule
 
         if existing_path
           # File exists (pre-built or previously written), register it as a file path
-          # The Set in @manifest will deduplicate if the same file is registered multiple times
+          # The manifest deduplicates by logical path if the same file is registered multiple times
           # This file will be served through Rails asset pipeline (stylesheet_link_tag)
           link_options = stylesheet_link_options || {}
           register(existing_path, namespace: namespace, **link_options)
@@ -248,15 +312,21 @@ module StyleCapsule
       # Use cached CSS if available, otherwise use provided CSS
       final_css = cached_css || css_content
 
-      # Store in request-scoped registry
-      registry = inline_stylesheets
-      registry[ns] ||= []
-      registry[ns] << {
-        type: :inline,
-        css_content: final_css,
-        capsule_id: capsule_id
-      }
-      self.inline_stylesheets = registry
+      Instrumentation.instrument_registration(
+        namespace: ns,
+        file_path: nil,
+        inline_size: final_css.bytesize,
+        cache_strategy: cache_strategy
+      ) do
+        registry = inline_stylesheets
+        registry[ns] ||= []
+        registry[ns] << {
+          type: :inline,
+          css_content: final_css,
+          capsule_id: capsule_id
+        }
+        self.inline_stylesheets = registry
+      end
 
       # Cache the CSS if strategy is enabled and not already cached
       if cache_strategy != :none && cache_key && !cached_css && cache_strategy != :file
@@ -291,7 +361,9 @@ module StyleCapsule
         return nil if cache_ttl && cached_entry[:expires_at] && current_time > cached_entry[:expires_at]
       when :proc
         return nil unless cache_proc
-        # Proc should validate cache entry
+        # Re-validation: the proc is invoked on every read with the *current* request's CSS.
+        # Return [_, true, _] from the proc to keep using the cached entry; false invalidates it.
+        # (This is closer to a conditional cache than a blind key/value store.)
         _key, should_use, _expires = cache_proc.call(css_content, capsule_id, namespace)
         return nil unless should_use
       end
@@ -401,9 +473,9 @@ module StyleCapsule
 
     # Get all registered file paths from process-wide manifest (organized by namespace)
     #
-    # @return [Hash<Symbol, Set<Hash>>] Hash of namespace => set of file registrations
+    # @return [Hash<Symbol, Array<Hash>>] Hash of namespace => array of file registrations
     def self.manifest_files
-      @manifest.dup
+      @manifest.transform_values { |h| h.values }
     end
 
     # Get all registered inline stylesheets for current request (organized by namespace)
@@ -413,38 +485,51 @@ module StyleCapsule
       inline_stylesheets
     end
 
+    # Get all request-scoped file stylesheets for the current request (organized by namespace)
+    #
+    # @return [Hash<Symbol, Hash<String, Hash>>] Hash of namespace => logical path => registration
+    def self.request_stylesheet_files
+      request_file_stylesheets
+    end
+
     # Get all stylesheets (files + inline) for a specific namespace
     #
     # @param namespace [Symbol, String, nil] Namespace identifier (nil/blank uses default)
     # @return [Array<Hash>] Array of stylesheet registrations for the namespace
     def self.stylesheets_for(namespace: nil)
       ns = normalize_namespace(namespace)
-      result = []
+      result = merged_file_registrations_for_namespace(ns)
 
-      # Add process-wide file paths
-      if @manifest[ns]
-        result.concat(@manifest[ns].to_a)
-      end
-
-      # Add request-scoped inline CSS
       inline = request_inline_stylesheets[ns] || []
       result.concat(inline)
 
       result
     end
 
-    # Clear request-scoped inline stylesheets (does not clear process-wide manifest)
+    # Whether request-scoped stylesheets remain to inject into +<head>+
+    #
+    # @return [Boolean]
+    def self.pending_head_stylesheets?
+      !pending_request_stylesheets.empty?
+    end
+
+    # Clear request-scoped inline CSS and render-time file registrations (does not clear process-wide manifest)
     #
     # @param namespace [Symbol, String, nil] Optional namespace to clear (nil clears all)
     # @return [void]
     def self.clear(namespace: nil)
       if namespace.nil?
         self.inline_stylesheets = {}
+        self.request_file_stylesheets = {}
       else
         ns = normalize_namespace(namespace)
-        registry = inline_stylesheets
-        registry.delete(ns)
-        self.inline_stylesheets = registry
+        inline_registry = inline_stylesheets
+        inline_registry.delete(ns)
+        self.inline_stylesheets = inline_registry
+
+        file_registry = request_file_stylesheets
+        file_registry.delete(ns)
+        self.request_file_stylesheets = file_registry
       end
     end
 
@@ -464,8 +549,12 @@ module StyleCapsule
     # Render registered stylesheets as HTML
     #
     # This should be called in the layout's <head> section.
-    # Combines process-wide file manifest with request-scoped inline CSS.
-    # Automatically clears request-scoped inline CSS after rendering (manifest persists).
+    # Combines eager manifest files with request-scoped file paths and inline CSS
+    # registered before this call. Stylesheets registered later in the response are
+    # injected into +<head>+ by +HeadInjectionMiddleware+ when enabled.
+    #
+    # Automatically clears request-scoped inline CSS and file paths after rendering
+    # for the selected namespace(s). The eager manifest persists.
     #
     # @param view_context [ActionView::Base, nil] The view context (for helpers like content_tag, stylesheet_link_tag)
     #   In ERB: pass `self` (the view context)
@@ -475,20 +564,13 @@ module StyleCapsule
     # @return [String] HTML-safe string with stylesheet tags
     def self.render_head_stylesheets(view_context = nil, namespace: nil)
       if namespace.nil? || namespace.to_s.strip.empty?
-        # Render all namespaces
-        all_stylesheets = []
+        all_stylesheets = merged_file_registrations_all_namespaces
 
-        # Collect from process-wide manifest (all namespaces)
-        @manifest.each do |ns, files|
-          all_stylesheets.concat(files.to_a)
-        end
-
-        # Collect from request-scoped inline CSS (all namespaces)
         request_inline_stylesheets.each do |_ns, inline|
           all_stylesheets.concat(inline)
         end
 
-        clear # Clear request-scoped inline CSS only
+        clear # Clear request-scoped inline CSS and file paths only
         return safe_string("") if all_stylesheets.empty?
 
         all_stylesheets.map do |stylesheet|
@@ -503,7 +585,7 @@ module StyleCapsule
         # Render specific namespace
         ns = normalize_namespace(namespace)
         stylesheets = stylesheets_for(namespace: ns).dup
-        clear(namespace: ns) # Clear request-scoped inline CSS only
+        clear(namespace: ns) # Clear request-scoped inline CSS and file paths only
 
         return safe_string("") if stylesheets.empty?
 
@@ -526,19 +608,111 @@ module StyleCapsule
       if namespace.nil?
         # Check process-wide manifest
         has_files = !@manifest.empty? && @manifest.values.any? { |files| !files.empty? }
+        # Check request-scoped file paths
+        request_files = request_file_stylesheets
+        has_request_files = !request_files.empty? && request_files.values.any? { |files| !files.empty? }
         # Check request-scoped inline CSS
         inline = request_inline_stylesheets
         has_inline = !inline.empty? && inline.values.any? { |stylesheets| !stylesheets.empty? }
-        has_files || has_inline
+        has_files || has_request_files || has_inline
       else
         ns = normalize_namespace(namespace)
         # Check process-wide manifest
         has_files = @manifest[ns] && !@manifest[ns].empty?
+        # Check request-scoped file paths
+        has_request_files = request_file_stylesheets[ns] && !request_file_stylesheets[ns].empty?
         # Check request-scoped inline CSS
         has_inline = request_inline_stylesheets[ns] && !request_inline_stylesheets[ns].empty?
-        !!(has_files || has_inline)
+        !!(has_files || has_request_files || has_inline)
       end
     end
+
+    # Inject pending request-scoped stylesheets into an HTML document before +</head>+.
+    #
+    # Used by +HeadInjectionMiddleware+ after the body has rendered and components have
+    # called +register_stylesheet+ or +register_inline+.
+    #
+    # @param html [String] Full HTML response body
+    # @param view_context [ActionView::Base, nil] View context for +stylesheet_link_tag+
+    # @return [String] HTML with pending stylesheet tags injected, or the original HTML
+    def self.inject_pending_head_stylesheets(html, view_context = nil)
+      pending_stylesheets = pending_request_stylesheets
+      return html if pending_stylesheets.empty?
+
+      closing_head_index = html.match(%r{</head>}i)&.begin(0)
+      return html unless closing_head_index
+
+      tags = render_stylesheet_tags(pending_stylesheets, view_context)
+      return html if tags.empty?
+
+      injected = html.dup
+      injected.insert(closing_head_index, "#{tags}\n")
+      clear
+      injected
+    end
+
+    # @api private
+    def self.merged_file_registrations_for_namespace(namespace)
+      merge_file_registrations(@manifest[namespace], request_file_stylesheets[namespace])
+    end
+
+    # @api private
+    def self.merged_file_registrations_all_namespaces
+      merged = {}
+
+      @manifest.each do |ns, files|
+        files.each_value do |entry|
+          merged[[ns, entry[:file_path]]] = entry
+        end
+      end
+
+      request_file_stylesheets.each do |ns, files|
+        files.each_value do |entry|
+          merged[[ns, entry[:file_path]]] = entry
+        end
+      end
+
+      merged.values
+    end
+
+    # @api private
+    def self.merge_file_registrations(eager_files, request_files)
+      merged = {}
+      eager_files&.each_value { |entry| merged[entry[:file_path]] = entry }
+      request_files&.each_value { |entry| merged[entry[:file_path]] = entry }
+      merged.values
+    end
+
+    # @api private
+    def self.pending_request_stylesheets
+      stylesheets = []
+
+      request_file_stylesheets.each_value do |files|
+        stylesheets.concat(files.values)
+      end
+
+      request_inline_stylesheets.each_value do |inline_styles|
+        stylesheets.concat(inline_styles)
+      end
+
+      stylesheets
+    end
+
+    # @api private
+    def self.render_stylesheet_tags(stylesheets, view_context)
+      return safe_string("") if stylesheets.empty?
+
+      stylesheets.map do |stylesheet|
+        if stylesheet[:type] == :inline
+          render_inline_stylesheet(stylesheet, view_context)
+        else
+          render_file_stylesheet(stylesheet, view_context)
+        end
+      end.join("\n").then { |output| safe_string(output) }.to_s
+    end
+    private_class_method :pending_request_stylesheets, :render_stylesheet_tags,
+      :merged_file_registrations_for_namespace, :merged_file_registrations_all_namespaces,
+      :merge_file_registrations
 
     # Render a file-based stylesheet
     def self.render_file_stylesheet(stylesheet, view_context)
@@ -548,7 +722,7 @@ module StyleCapsule
       if view_context&.respond_to?(:stylesheet_link_tag)
         view_context.stylesheet_link_tag(file_path, **options)
       else
-        # Fallback if no view context
+        # Fallback if no view context (logical path validated in .register)
         href = "/assets/#{file_path}.css"
         tag_options = options.map { |k, v| %(#{k}="#{v}") }.join(" ")
         safe_string(%(<link rel="stylesheet" href="#{href}"#{" #{tag_options}" unless tag_options.empty?}>))
