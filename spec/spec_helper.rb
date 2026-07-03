@@ -216,4 +216,3 @@ RSpec.configure do |config|
 end
 require "polyrun/rspec"
 Polyrun::RSpec.install_failure_fragments!
-

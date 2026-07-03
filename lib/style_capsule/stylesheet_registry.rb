@@ -674,7 +674,7 @@ module StyleCapsule
       if file_paths.any?
         file_registry = request_file_stylesheets
         file_paths.each { |path| file_registry[ns]&.delete(path) }
-        file_registry.delete(ns) if file_registry[ns]&.empty?
+        file_registry.delete(ns) if file_registry[ns] && file_registry[ns].empty?
         self.request_file_stylesheets = file_registry
       end
 
