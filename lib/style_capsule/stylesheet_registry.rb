@@ -567,38 +567,51 @@ module StyleCapsule
     # rubocop:disable Metrics/AbcSize, Metrics/PerceivedComplexity -- renders mixed inline and file registrations
     def self.render_head_stylesheets(view_context = nil, namespace: nil)
       if namespace.nil? || namespace.to_s.strip.empty?
+        request_files_snapshot = request_file_stylesheets.transform_values { |files| files.keys.dup }
+        request_inline_snapshot = request_inline_stylesheets.transform_values(&:dup)
+
         all_stylesheets = merged_file_registrations_all_namespaces
 
         request_inline_stylesheets.each do |_ns, inline|
           all_stylesheets.concat(inline)
         end
 
-        clear # Clear request-scoped inline CSS and file paths only
         return safe_string("") if all_stylesheets.empty?
 
-        all_stylesheets.map do |stylesheet|
+        rendered = all_stylesheets.map do |stylesheet|
           if stylesheet[:type] == :inline
             render_inline_stylesheet(stylesheet, view_context)
           else
             render_file_stylesheet(stylesheet, view_context)
           end
         end.join("\n").then { |s| safe_string(s) }
+
+        clear_snapshotted_request_registrations(request_files_snapshot, request_inline_snapshot)
+        rendered
 
       else
         # Render specific namespace
         ns = normalize_namespace(namespace)
+        snapshotted_file_paths = request_file_stylesheets[ns]&.keys&.dup || []
+        snapshotted_inline = request_inline_stylesheets[ns]&.dup || []
         stylesheets = stylesheets_for(namespace: ns).dup
-        clear(namespace: ns) # Clear request-scoped inline CSS and file paths only
 
         return safe_string("") if stylesheets.empty?
 
-        stylesheets.map do |stylesheet|
+        rendered = stylesheets.map do |stylesheet|
           if stylesheet[:type] == :inline
             render_inline_stylesheet(stylesheet, view_context)
           else
             render_file_stylesheet(stylesheet, view_context)
           end
         end.join("\n").then { |s| safe_string(s) }
+
+        clear_snapshotted_request_registrations_for_namespace(
+          ns,
+          file_paths: snapshotted_file_paths,
+          snapshotted_inline_stylesheets: snapshotted_inline
+        )
+        rendered
 
       end
     end
@@ -632,6 +645,55 @@ module StyleCapsule
       end
     end
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+
+    # @api private
+    def self.clear_snapshotted_request_registrations(files_snapshot, inline_snapshot)
+      files_snapshot.each do |ns, file_paths|
+        clear_snapshotted_request_registrations_for_namespace(
+          ns,
+          file_paths: file_paths,
+          snapshotted_inline_stylesheets: inline_snapshot[ns] || []
+        )
+      end
+
+      inline_snapshot.each do |ns, snapshotted_inline_stylesheets|
+        next if files_snapshot.key?(ns)
+
+        clear_snapshotted_request_registrations_for_namespace(
+          ns,
+          file_paths: [],
+          snapshotted_inline_stylesheets: snapshotted_inline_stylesheets
+        )
+      end
+    end
+
+    # @api private
+    def self.clear_snapshotted_request_registrations_for_namespace(namespace, file_paths:, snapshotted_inline_stylesheets:)
+      ns = normalize_namespace(namespace)
+
+      if file_paths.any?
+        file_registry = request_file_stylesheets
+        file_paths.each { |path| file_registry[ns]&.delete(path) }
+        file_registry.delete(ns) if file_registry[ns]&.empty?
+        self.request_file_stylesheets = file_registry
+      end
+
+      return if snapshotted_inline_stylesheets.empty?
+
+      inline_registry = inline_stylesheets
+      current_inline = inline_registry[ns] || []
+      remaining_inline = current_inline.reject do |entry|
+        snapshotted_inline_stylesheets.any? { |snapshot_entry| snapshot_entry.equal?(entry) || snapshot_entry == entry }
+      end
+
+      if remaining_inline.empty?
+        inline_registry.delete(ns)
+      else
+        inline_registry[ns] = remaining_inline
+      end
+
+      self.inline_stylesheets = inline_registry
+    end
 
     # Inject pending request-scoped stylesheets into an HTML document before +</head>+.
     #
@@ -718,7 +780,8 @@ module StyleCapsule
     end
     private_class_method :pending_request_stylesheets, :render_stylesheet_tags,
       :merged_file_registrations_for_namespace, :merged_file_registrations_all_namespaces,
-      :merge_file_registrations
+      :merge_file_registrations, :clear_snapshotted_request_registrations,
+      :clear_snapshotted_request_registrations_for_namespace
 
     # Render a file-based stylesheet
     def self.render_file_stylesheet(stylesheet, view_context)

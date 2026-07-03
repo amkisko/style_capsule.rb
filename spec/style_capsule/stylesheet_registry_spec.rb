@@ -269,6 +269,16 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
       expect(result).to include("stylesheet")
       expect(result).to include("style")
     end
+
+    it "keeps request-scoped registrations added after template pre-render for head injection" do
+      described_class.register("stylesheets/page", namespace: :user)
+      described_class.render_head_stylesheets(view_context, namespace: :user)
+      described_class.register("stylesheets/navigation", namespace: :user)
+
+      expect(described_class.stylesheets_for(namespace: :user).map { |entry| entry[:file_path] }).to eq(
+        ["stylesheets/navigation"]
+      )
+    end
   end
 
   describe ".clear_inline_cache" do

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 2.0.1 (2026-07-03)
+
+- Fix `render_head_stylesheets` clearing request-scoped registrations added after a template pre-render but before layout head (Phlex + Rails layout capture)
+  - Only remove request-scoped entries that existed when head rendering started; later body registrations remain for `HeadInjectionMiddleware`
+- Document Phlex + Rails layout pattern: when `HeadInjectionMiddleware` is enabled, omit `stylesheet_registry_tags` for request-scoped namespaces and let the middleware inject all pending styles before `</head>` (calling `render_head_stylesheets` in layout head clears pre-captured template registrations without reliably writing tags into the Phlex buffer)
+
 ## 2.0.0 (2026-07-03)
 
 - BREAKING: split `StylesheetRegistry.register` into request-scoped `register` and boot-time `register_eager`
