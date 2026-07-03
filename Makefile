@@ -8,4 +8,4 @@ lint:
 	bundle exec rbs validate
 
 test:
-	bundle exec rspec
+	bundle exec polyrun parallel-rspec --workers 5 --merge-failures

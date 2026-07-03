@@ -1,0 +1,20 @@
+prayfile "1"
+
+source "amkisko", "git+https://github.com/amkisko/prayers.git"
+
+target :agents do
+  output "AGENTS.md"
+  skills ".agents/skills"
+end
+
+# agent "amkisko/getting-started", "~> 0.1", source: "amkisko", exports: ["getting-started"]
+# agent "amkisko/working-rules", "~> 0.1", source: "amkisko", exports: ["working-rules"]
+# agent "amkisko/minimal-implementation", "~> 0.1", source: "amkisko", exports: ["minimal-implementation"]
+# agent "amkisko/branch-naming", "~> 0.1", source: "amkisko", exports: ["branch-naming"]
+# agent "amkisko/changelog-update", "~> 0.1", source: "amkisko", exports: ["skill"]
+# agent "amkisko/engineering-audit", "~> 0.1", source: "amkisko", exports: ["skill"]
+# agent "amkisko/writing-prose", "~> 0.1", source: "amkisko", exports: ["writing-prose"]
+
+# local "agent/local/project.md", position: :before
+
+render mode: :managed, conflict: :fail, churn: :minimal

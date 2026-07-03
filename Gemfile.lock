@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    style_capsule (2.0.0)
+    style_capsule (2.0.1)
 
 GEM
   remote: https://rubygems.org/
@@ -73,11 +73,7 @@ GEM
       crass (~> 1.0.2)
       nokogiri (>= 1.12.0)
     memory_profiler (1.1.0)
-    mini_portile2 (2.8.9)
     minitest (5.26.2)
-    nokogiri (1.18.10)
-      mini_portile2 (~> 2.8.2)
-      racc (~> 1.4)
     nokogiri (1.18.10-aarch64-linux-gnu)
       racc (~> 1.4)
     nokogiri (1.18.10-aarch64-linux-musl)
@@ -104,6 +100,7 @@ GEM
       phlex (~> 2.3.0)
       railties (>= 7.1, < 9)
       zeitwerk (~> 2.7)
+    polyrun (1.5.0)
     pp (0.6.3)
       prettyprint
     prettyprint (0.2.0)
@@ -273,6 +270,7 @@ DEPENDENCIES
   appraisal (~> 2)
   memory_profiler (~> 1)
   phlex-rails (~> 2.0)
+  polyrun (~> 1.5.0)
   railties (>= 6.0, < 9.0)
   rake (~> 13)
   rbs (~> 3)

@@ -1,16 +1,16 @@
-require "simplecov"
-require "simplecov-cobertura"
-require "simplecov_json_formatter"
+polyrun_cov_measure =
+  ENV["POLYRUN_COVERAGE_DISABLE"] != "1" &&
+  %w[1 true yes].include?(ENV["POLYRUN_COVERAGE"]&.to_s&.downcase)
 
-SimpleCov.start do
-  track_files "{lib,app}/**/*.rb"
-  add_filter "/lib/tasks/"
-  add_filter "/lib/style_capsule/version.rb"
-  formatter SimpleCov::Formatter::MultiFormatter.new([
-    SimpleCov::Formatter::HTMLFormatter,
-    SimpleCov::Formatter::CoberturaFormatter,
-    SimpleCov::Formatter::JSONFormatter
-  ])
+if polyrun_cov_measure
+  require "coverage"
+  branch = %w[1 true yes].include?(ENV["POLYRUN_COVERAGE_BRANCHES"]&.to_s&.downcase)
+  ::Coverage.start(lines: true, branches: branch)
+end
+
+if polyrun_cov_measure
+  require "polyrun/coverage/rails"
+  Polyrun::Coverage::Rails.start!(root: File.expand_path("..", __dir__))
 end
 
 require "rspec"
@@ -214,16 +214,6 @@ RSpec.configure do |config|
     end
   end
 end
+require "polyrun/rspec"
+Polyrun::RSpec.install_failure_fragments!
 
-# Run coverage analyzer after SimpleCov finishes writing coverage.xml
-# Use SimpleCov.at_exit to ensure our hook runs after the formatter writes files
-# We need to call the formatter first, then run our analyzer
-if ENV["SHOW_ZERO_COVERAGE"] == "1"
-  SimpleCov.at_exit do
-    # First, ensure the formatter runs (this writes coverage.xml)
-    SimpleCov.result.format!
-    # Then run our analyzer
-    require_relative "support/coverage_analyzer"
-    CoverageAnalyzer.run
-  end
-end
