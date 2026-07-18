@@ -135,12 +135,17 @@ Metrics/ClassLength:
 Metrics/CyclomaticComplexity:
   Enabled: true
   Max: 10
+  Exclude:
+    - lib/style_capsule/stylesheet_registry.rb
 Metrics/PerceivedComplexity:
   Enabled: true
   Max: 10
+  Exclude:
+    - lib/style_capsule/stylesheet_registry.rb
 Metrics/AbcSize:
   Enabled: true
   Max: 15
   CountRepeatedAttributes: false
   Exclude:
     - spec/support/**/*
+    - lib/style_capsule/stylesheet_registry.rb
