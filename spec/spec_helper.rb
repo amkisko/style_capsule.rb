@@ -22,10 +22,10 @@ require "fileutils"
 module StyleCapsule
   # Lightweight Rails test doubles (avoid ostruct stdlib deprecation on Ruby 3.5+)
   module SpecRailsMocks
-    AssetsConfig = Struct.new(:paths, keyword_init: true)
+    AssetsConfig = Struct.new(:paths)
 
-    RoutesConfig = Struct.new(:url_helpers, keyword_init: true)
-    ApplicationConfig = Struct.new(:assets, keyword_init: true)
+    RoutesConfig = Struct.new(:url_helpers)
+    ApplicationConfig = Struct.new(:assets)
   end
 end
 
@@ -215,4 +215,12 @@ RSpec.configure do |config|
   end
 end
 require "polyrun/rspec"
+Polyrun::RSpec.install_sharded_formatter_compat!
 Polyrun::RSpec.install_failure_fragments!
+Polyrun::RSpec.install_worker_ping!
+Polyrun::RSpec.install_example_debug!
+Polyrun::RSpec.install_example_rails_logging!
+Polyrun::RSpec.install_example_timeout!
+if %w[1 true yes].include?(ENV["POLYRUN_SPEC_QUALITY"]&.to_s&.downcase)
+  Polyrun::RSpec.install_spec_quality!
+end

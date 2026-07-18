@@ -250,7 +250,7 @@ RSpec.describe StyleCapsule::ComponentBuilder do
         file_path = described_class.build_component(component_class, output_proc: ->(msg) { output_messages << msg })
 
         expect(file_path).to be_a(String)
-        expect(output_messages).to include(match(/Generated:/))
+        expect(output_messages).to include(a_string_including("Generated:"))
         expect(StyleCapsule::CssFileWriter.file_exists?(
           component_class: component_class,
           capsule_id: component_class.new.component_capsule
@@ -337,7 +337,7 @@ RSpec.describe StyleCapsule::ComponentBuilder do
         file_path = described_class.build_component(component_class, output_proc: ->(msg) { output_messages << msg })
 
         expect(file_path).to be_nil
-        expect(output_messages).to include(match(/Skipped/))
+        expect(output_messages).to include(a_string_including("Skipped"))
       end
     end
   end
@@ -366,7 +366,7 @@ RSpec.describe StyleCapsule::ComponentBuilder do
       count = described_class.build_all(output_proc: ->(msg) { output_messages << msg })
 
       expect(count).to be >= 0  # May be 0 if no components found, or >= 1 if found
-      expect(output_messages).to include(match(/StyleCapsule CSS files built successfully/))
+      expect(output_messages).to include(a_string_including("StyleCapsule CSS files built successfully"))
     end
   end
 end

@@ -35,7 +35,9 @@ module CoverageAnalyzer
 
     # Sort by file, then by line number
     uncovered.sort_by { |e| [e[:file], e[:line]] }.each do |line_info|
+      # rubocop:disable RSpec/Output -- uncovered line listing is the script output
       puts "#{line_info[:file]}:#{line_info[:line]}"
+      # rubocop:enable RSpec/Output
     end
   end
 
