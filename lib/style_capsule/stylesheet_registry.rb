@@ -564,7 +564,17 @@ module StyleCapsule
     #   If nil, falls back to basic HTML generation
     # @param namespace [Symbol, String, nil] Optional namespace to render (nil/blank renders all namespaces)
     # @return [String] HTML-safe string with stylesheet tags
-    # rubocop:disable Metrics/AbcSize, Metrics/PerceivedComplexity -- renders mixed inline and file registrations
+    def self.render_stylesheet_entries(stylesheets, view_context)
+      stylesheets.map do |stylesheet|
+        if stylesheet[:type] == :inline
+          render_inline_stylesheet(stylesheet, view_context)
+        else
+          render_file_stylesheet(stylesheet, view_context)
+        end
+      end.join("\n").then { |s| safe_string(s) }
+    end
+
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- renders mixed inline and file registrations
     def self.render_head_stylesheets(view_context = nil, namespace: nil)
       if namespace.nil? || namespace.to_s.strip.empty?
         request_files_snapshot = request_file_stylesheets.transform_values { |files| files.keys.dup }
@@ -578,16 +588,9 @@ module StyleCapsule
 
         return safe_string("") if all_stylesheets.empty?
 
-        rendered = all_stylesheets.map do |stylesheet|
-          if stylesheet[:type] == :inline
-            render_inline_stylesheet(stylesheet, view_context)
-          else
-            render_file_stylesheet(stylesheet, view_context)
-          end
-        end.join("\n").then { |s| safe_string(s) }
+        rendered = render_stylesheet_entries(all_stylesheets, view_context)
 
         clear_snapshotted_request_registrations(request_files_snapshot, request_inline_snapshot)
-        rendered
 
       else
         # Render specific namespace
@@ -598,24 +601,19 @@ module StyleCapsule
 
         return safe_string("") if stylesheets.empty?
 
-        rendered = stylesheets.map do |stylesheet|
-          if stylesheet[:type] == :inline
-            render_inline_stylesheet(stylesheet, view_context)
-          else
-            render_file_stylesheet(stylesheet, view_context)
-          end
-        end.join("\n").then { |s| safe_string(s) }
+        rendered = render_stylesheet_entries(stylesheets, view_context)
 
         clear_snapshotted_request_registrations_for_namespace(
           ns,
           file_paths: snapshotted_file_paths,
           snapshotted_inline_stylesheets: snapshotted_inline
         )
-        rendered
 
       end
+
+      rendered
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/PerceivedComplexity
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     # Check if there are any registered stylesheets
     #
@@ -668,6 +666,7 @@ module StyleCapsule
     end
 
     # @api private
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- clears snapshotted request registries per namespace
     def self.clear_snapshotted_request_registrations_for_namespace(namespace, file_paths:, snapshotted_inline_stylesheets:)
       ns = normalize_namespace(namespace)
 
@@ -694,6 +693,7 @@ module StyleCapsule
 
       self.inline_stylesheets = inline_registry
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     # Inject pending request-scoped stylesheets into an HTML document before +</head>+.
     #

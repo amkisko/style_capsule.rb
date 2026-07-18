@@ -275,7 +275,7 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
       described_class.render_head_stylesheets(view_context, namespace: :user)
       described_class.register("stylesheets/navigation", namespace: :user)
 
-      expect(described_class.stylesheets_for(namespace: :user).map { |entry| entry[:file_path] }).to eq(
+      expect(described_class.stylesheets_for(namespace: :user).pluck(:file_path)).to eq(
         ["stylesheets/navigation"]
       )
     end
