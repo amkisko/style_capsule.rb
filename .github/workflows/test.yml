@@ -17,6 +17,8 @@ jobs:
             ruby_version: "3.2"
           - gemfile: rails8ruby34
             ruby_version: "3.4"
+          - gemfile: rails8ruby4
+            ruby_version: "4.0"
           - gemfile: rails8truffleruby
             ruby_version: "truffleruby"
     

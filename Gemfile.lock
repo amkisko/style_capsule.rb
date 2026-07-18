@@ -104,7 +104,7 @@ GEM
       phlex (~> 2.3.0)
       railties (>= 7.1, < 9)
       zeitwerk (~> 2.7)
-    polyrun (1.5.0)
+    polyrun (2.2.0)
     pp (0.6.3)
       prettyprint
     prettyprint (0.2.0)
@@ -274,7 +274,7 @@ DEPENDENCIES
   appraisal (~> 2)
   memory_profiler (~> 1)
   phlex-rails (~> 2.0)
-  polyrun (~> 1.5.0)
+  polyrun (>= 2.2.0)
   railties (>= 6.0, < 9.0)
   rake (~> 13)
   rbs (~> 3)
@@ -295,4 +295,4 @@ DEPENDENCIES
   webmock (~> 3)
 
 BUNDLED WITH
-   2.7.2
+  4.0.16
