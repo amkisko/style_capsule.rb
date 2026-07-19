@@ -1,6 +1,6 @@
 # style_capsule
 
-[![Gem Version](https://badge.fury.io/rb/style_capsule.svg?v=2.0.0)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/amkisko/style_capsule.rb/graph/badge.svg?token=2U6NXJOVVM)](https://codecov.io/gh/amkisko/style_capsule.rb)
+[![Gem Version](https://badge.fury.io/rb/style_capsule.svg?v=2.0.0)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/amkisko/style_capsule.rb/graph/badge.svg?token=2U6NXJOVVM)](https://app.codecov.io/github/amkisko/style_capsule.rb)
 
 CSS scoping extension for Ruby components. Provides attribute-based style encapsulation for Phlex, ViewComponent, and ERB templates to prevent style leakage between components. Works with Rails and can be used standalone in other Ruby frameworks (Sinatra, Hanami, etc.) or plain Ruby scripts. Includes configurable caching strategies for optimal performance.
 
@@ -518,6 +518,19 @@ StyleCapsule includes security protections:
 - XSS prevention via Rails' HTML escaping
 
 For detailed security information, see [SECURITY.md](SECURITY.md).
+
+## Links
+
+- [GitHub](https://github.com/amkisko/style_capsule.rb)
+- [GitLab](https://gitlab.com/amkisko/style_capsule.rb)
+- [RubyGems](https://rubygems.org/gems/style_capsule)
+- [Versions Atom](https://rubygems.org/gems/style_capsule/versions.atom) (feed id `9946895197223`)
+- [libraries.io](https://libraries.io/rubygems/style_capsule)
+- [Deps.dev](https://deps.dev/rubygems/style_capsule)
+- [SonarCloud](https://sonarcloud.io/project/overview?id=amkisko_style_capsule.rb)
+- [Snyk](https://snyk.io/test/github/amkisko/style_capsule.rb)
+- [Codecov](https://app.codecov.io/github/amkisko/style_capsule.rb)
+- [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/amkisko/style_capsule.rb)
 
 ## License
 

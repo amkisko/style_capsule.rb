@@ -270,12 +270,12 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
-  activesupport (>= 6.0, < 9.0)
+  activesupport (>= 7.0, < 9.0)
   appraisal (~> 2)
   memory_profiler (~> 1)
   phlex-rails (~> 2.0)
   polyrun (>= 2.2.0)
-  railties (>= 6.0, < 9.0)
+  railties (>= 7.0, < 9.0)
   rake (~> 13)
   rbs (~> 3)
   rspec (~> 3)

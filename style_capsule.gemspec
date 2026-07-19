@@ -18,7 +18,7 @@ Gem::Specification.new do |spec|
   end
   spec.files += Dir["lib/tasks/**/*.rake"]
   spec.require_paths = ["lib"]
-  spec.required_ruby_version = ">= 3.0"
+  spec.required_ruby_version = ">= 3.4"
 
   spec.metadata = {
     "homepage_uri" => spec.homepage,
@@ -28,8 +28,8 @@ Gem::Specification.new do |spec|
     "rubygems_mfa_required" => "true"
   }
 
-  spec.add_development_dependency "activesupport", ">= 6.0", "< 9.0"  # Optional, recommended for Rails
-  spec.add_development_dependency "railties", ">= 6.0", "< 9.0"  # For testing Rails integration
+  spec.add_development_dependency "activesupport", ">= 7.0", "< 9.0"  # Optional, recommended for Rails
+  spec.add_development_dependency "railties", ">= 7.0", "< 9.0"  # For testing Rails integration
   spec.add_development_dependency "rspec", "~> 3"
   spec.add_development_dependency "polyrun", ">= 2.2.0"
   spec.add_development_dependency "webmock", "~> 3"
