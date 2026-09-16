@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Fail closed when CSS would close a style tag before it is written into HTML
+- Escape allowed attributes on the non-Rails stylesheet link fallback
+- Bound the inline stylesheet cache
+- Run lint and tests on pull requests
+- Align documented Ruby and Rails floors with the gemspec
+
 ## 2.0.1 (2026-07-03)
 
 - Fix `render_head_stylesheets` clearing request-scoped registrations added after a template pre-render but before layout head (Phlex + Rails layout capture)

@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
+require "cgi"
 require_relative "instrumentation"
 require_relative "asset_path"
+require_relative "css_processor"
 
 module StyleCapsule
   # Helper to determine the parent class for StylesheetRegistry
@@ -72,14 +74,18 @@ module StyleCapsule
   class StylesheetRegistry < StyleCapsule.stylesheet_registry_parent_class
     # Default namespace for backward compatibility
     DEFAULT_NAMESPACE = :default
+    MAX_INLINE_CACHE_ENTRIES = 256
+    FALLBACK_LINK_OPTION_NAME = /\A(?:media|title|crossorigin|integrity|nonce|type|id|class|data-[a-zA-Z0-9_-]+)\z/
 
     # Process-wide manifest for static file paths (like Propshaft)
     # Organized by namespace: { namespace => { logical_path => { file_path:, options: } } }
     @manifest = {} # rubocop:disable Style/ClassVars, ThreadSafety/MutableClassInstanceVariable
+    @manifest_mutex = Mutex.new
 
     # Process-wide cache for inline CSS (with expiration support)
     # Structure: { cache_key => { css_content: String, cached_at: Time, expires_at: Time } }
     @inline_cache = {} # rubocop:disable Style/ClassVars, ThreadSafety/MutableClassInstanceVariable
+    @inline_cache_mutex = Mutex.new
 
     # Track last cleanup time for lazy cleanup (prevents excessive cleanup calls)
     @last_cleanup_time = nil # rubocop:disable Style/ClassVars
@@ -222,8 +228,10 @@ module StyleCapsule
         inline_size: nil,
         cache_strategy: :none
       ) do
-        @manifest[ns] ||= {}
-        @manifest[ns][path] = {file_path: path, options: options}
+        with_manifest do
+          @manifest[ns] ||= {}
+          @manifest[ns][path] = {file_path: path, options: options}
+        end
       end
     end
 
@@ -350,11 +358,10 @@ module StyleCapsule
     # @param namespace [Symbol] Namespace (for proc strategy)
     # @return [String, nil] Cached CSS content or nil if not cached/expired
     def self.cached_inline(cache_key, cache_strategy:, cache_ttl: nil, cache_proc: nil, css_content: nil, capsule_id: nil, namespace: nil)
-      # Lazy cleanup: remove expired entries if it's been a while (every 5 minutes)
-      # This prevents memory leaks in long-running processes without impacting performance
-      cleanup_expired_cache_if_needed
-
-      cached_entry = @inline_cache[cache_key]
+      cached_entry = with_inline_cache do
+        cleanup_expired_cache_unlocked_if_needed
+        @inline_cache[cache_key]
+      end
       return nil unless cached_entry
 
       # Check expiration based on strategy
@@ -402,11 +409,16 @@ module StyleCapsule
         end
       end
 
-      @inline_cache[cache_key] = {
-        css_content: css_content,
-        cached_at: current_time,
-        expires_at: expires_at
-      }
+      with_inline_cache do
+        unless @inline_cache.key?(cache_key)
+          @inline_cache.shift while @inline_cache.size >= MAX_INLINE_CACHE_ENTRIES
+        end
+        @inline_cache[cache_key] = {
+          css_content: css_content,
+          cached_at: current_time,
+          expires_at: expires_at
+        }
+      end
     end
 
     # Clear inline CSS cache
@@ -414,10 +426,12 @@ module StyleCapsule
     # @param cache_key [String, nil] Specific cache key to clear (nil clears all)
     # @return [void]
     def self.clear_inline_cache(cache_key = nil)
-      if cache_key
-        @inline_cache.delete(cache_key)
-      else
-        @inline_cache.clear
+      with_inline_cache do
+        if cache_key
+          @inline_cache.delete(cache_key)
+        else
+          @inline_cache.clear
+        end
       end
     end
 
@@ -437,13 +451,16 @@ module StyleCapsule
     #   # In a scheduled job or initializer
     #   StyleCapsule::StylesheetRegistry.cleanup_expired_cache
     def self.cleanup_expired_cache
+      with_inline_cache { cleanup_expired_cache_unlocked }
+    end
+
+    def self.cleanup_expired_cache_unlocked
       return 0 if @inline_cache.empty?
 
       now = current_time
       expired_keys = []
 
       @inline_cache.each do |cache_key, entry|
-        # Remove entries that have an expires_at time and it's in the past
         if entry[:expires_at] && now > entry[:expires_at]
           expired_keys << cache_key
         end
@@ -455,23 +472,24 @@ module StyleCapsule
       expired_keys.size
     end
 
-    # Check if cleanup is needed and perform it if so
-    #
-    # Only performs cleanup if it's been more than 5 minutes since the last cleanup.
-    # This prevents excessive cleanup calls while still preventing memory leaks.
-    #
-    # @return [void]
-    # @api private
-    def self.cleanup_expired_cache_if_needed
-      # Cleanup every 5 minutes (300 seconds) to balance memory usage and performance
+    def self.cleanup_expired_cache_unlocked_if_needed
       cleanup_interval = 300
 
       if @last_cleanup_time.nil? || (current_time - @last_cleanup_time) > cleanup_interval
-        cleanup_expired_cache
+        cleanup_expired_cache_unlocked
       end
     end
 
-    private_class_method :cleanup_expired_cache_if_needed
+    def self.with_inline_cache
+      @inline_cache_mutex.synchronize { yield }
+    end
+
+    def self.with_manifest
+      @manifest_mutex.synchronize { yield }
+    end
+
+    private_class_method :cleanup_expired_cache_unlocked, :cleanup_expired_cache_unlocked_if_needed,
+      :with_inline_cache, :with_manifest
 
     # Get all registered file paths from process-wide manifest (organized by namespace)
     #
@@ -540,11 +558,13 @@ module StyleCapsule
     # @param namespace [Symbol, String, nil] Optional namespace to clear (nil clears all)
     # @return [void]
     def self.clear_manifest(namespace: nil)
-      if namespace.nil?
-        @manifest = {}
-      else
-        ns = normalize_namespace(namespace)
-        @manifest.delete(ns)
+      with_manifest do
+        if namespace.nil?
+          @manifest = {}
+        else
+          ns = normalize_namespace(namespace)
+          @manifest.delete(ns)
+        end
       end
     end
 
@@ -793,20 +813,24 @@ module StyleCapsule
       else
         # Fallback if no view context (logical path validated in .register)
         href = "/assets/#{file_path}.css"
-        tag_options = options.map { |k, v| %(#{k}="#{v}") }.join(" ")
+        tag_options = fallback_link_option_attributes(options)
         safe_string(%(<link rel="stylesheet" href="#{href}"#{" #{tag_options}" unless tag_options.empty?}>))
       end
     end
 
-    # Render an inline stylesheet
-    def self.render_inline_stylesheet(stylesheet, view_context)
-      # CSS content is already scoped when registered from components
-      # capsule_id is stored for reference but CSS is pre-processed
-      css_content = stylesheet[:css_content]
+    def self.fallback_link_option_attributes(options)
+      options.filter_map do |key, value|
+        name = key.to_s
+        next unless name.match?(FALLBACK_LINK_OPTION_NAME)
 
-      # Construct HTML manually to avoid any HTML escaping issues
-      # CSS content should not be HTML-escaped as it's inside a <style> tag
-      # Using string interpolation with html_safe ensures CSS is not escaped
+        %(#{name}="#{CGI.escapeHTML(value.to_s)}")
+      end.join(" ")
+    end
+
+    # Render an inline stylesheet
+    def self.render_inline_stylesheet(stylesheet, _view_context)
+      css_content = stylesheet[:css_content]
+      CssProcessor.reject_style_element_breakout!(css_content)
       safe_string(%(<style type="text/css">#{css_content}</style>))
     end
 
@@ -822,6 +846,7 @@ module StyleCapsule
       end
     end
 
-    private_class_method :render_file_stylesheet, :render_inline_stylesheet, :safe_string
+    private_class_method :render_file_stylesheet, :render_inline_stylesheet, :safe_string,
+      :fallback_link_option_attributes
   end
 end

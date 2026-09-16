@@ -49,7 +49,7 @@ module StyleCapsule
         raise ArgumentError, "CSS content exceeds maximum size of #{MAX_CSS_SIZE} bytes (got #{css_string.bytesize} bytes)"
       end
 
-      # Validate capsule_id
+      reject_style_element_breakout!(css_string)
       validate_capsule_id!(capsule_id)
 
       # Instrument CSS processing with timing and size metrics
@@ -142,7 +142,7 @@ module StyleCapsule
         raise ArgumentError, "CSS content exceeds maximum size of #{MAX_CSS_SIZE} bytes (got #{css_string.bytesize} bytes)"
       end
 
-      # Validate capsule_id
+      reject_style_element_breakout!(css_string)
       validate_capsule_id!(capsule_id)
 
       # Instrument CSS processing with timing and size metrics
@@ -167,6 +167,20 @@ module StyleCapsule
       # Remove /* ... */ comments (including multi-line)
       # Use non-greedy match to handle multiple comments
       css.gsub(/\/\*.*?\*\//m, "")
+    end
+
+    # Reject CSS that would close an enclosing HTML style element
+    #
+    # HTML parses style-element content until the first case-insensitive closer,
+    # including sequences inside CSS comments or string literals.
+    #
+    # @param css_string [String, nil] CSS that will be placed inside a style tag
+    # @raise [ArgumentError] If the string contains a style element closer
+    def self.reject_style_element_breakout!(css_string)
+      return if css_string.blank?
+      return unless css_string.match?(%r{</style}i)
+
+      raise ArgumentError, "CSS content must not contain a style element closer"
     end
 
     # Validate capsule ID to prevent injection attacks

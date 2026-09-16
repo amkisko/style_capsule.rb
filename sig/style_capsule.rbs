@@ -9,6 +9,7 @@ module StyleCapsule
     def self.scope_selectors: (String css_string, String capsule_id, ?component_class: Class | String | nil) -> String
     def self.scope_with_nesting: (String css_string, String capsule_id, ?component_class: Class | String | nil) -> String
     def self.strip_comments: (String css) -> String
+    def self.reject_style_element_breakout!: (String | nil css_string) -> void
   end
 
   class CssFileWriter
@@ -24,6 +25,7 @@ module StyleCapsule
   # At runtime inherits Object when ActiveSupport::CurrentAttributes is unavailable.
   class StylesheetRegistry
     DEFAULT_NAMESPACE: Symbol
+    MAX_INLINE_CACHE_ENTRIES: Integer
 
     def self.normalize_namespace: (Symbol | String | nil namespace) -> Symbol
     def self.register: (String file_path, ?namespace: Symbol | String | nil, **Hash[untyped, untyped] options) -> void

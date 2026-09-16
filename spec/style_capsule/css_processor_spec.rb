@@ -201,6 +201,20 @@ RSpec.describe StyleCapsule::CssProcessor do
       expect(described_class.scope_selectors("   ", "abc123")).to eq("   ")
     end
 
+    it "rejects CSS that would close a style element" do
+      css = ".x { color: red; } </style><script>alert(1)</script><style>"
+      expect {
+        described_class.scope_selectors(css, "abc123")
+      }.to raise_error(ArgumentError, /style element closer/)
+    end
+
+    it "rejects a case-insensitive style element closer" do
+      css = ".x { content: '</STYLE>'; }"
+      expect {
+        described_class.scope_selectors(css, "abc123")
+      }.to raise_error(ArgumentError, /style element closer/)
+    end
+
     it "rejects CSS content that exceeds maximum size" do
       large_css = "a" * (StyleCapsule::CssProcessor::MAX_CSS_SIZE + 1)
       expect {
@@ -305,6 +319,13 @@ RSpec.describe StyleCapsule::CssProcessor do
       expect(described_class.scope_with_nesting("", "abc123")).to eq("")
       expect(described_class.scope_with_nesting(nil, "abc123")).to be_nil
       expect(described_class.scope_with_nesting("   ", "abc123")).to eq("   ")
+    end
+
+    it "rejects CSS that would close a style element" do
+      css = ".x { color: red; } </style><script>alert(1)</script>"
+      expect {
+        described_class.scope_with_nesting(css, "abc123")
+      }.to raise_error(ArgumentError, /style element closer/)
     end
 
     it "rejects CSS content that exceeds maximum size" do

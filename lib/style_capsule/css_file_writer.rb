@@ -2,6 +2,7 @@
 
 require "fileutils"
 require "digest/sha1"
+require "tmpdir"
 require_relative "instrumentation"
 
 module StyleCapsule
@@ -12,7 +13,7 @@ module StyleCapsule
   # via Rails asset pipeline.
   #
   # In production environments where the app directory is read-only (e.g., Docker containers),
-  # this class automatically falls back to writing files to /tmp/style_capsule when the
+  # this class automatically falls back to writing files under Dir.tmpdir when the
   # default location is not writable. When using the fallback directory, write_css returns
   # nil, causing StylesheetRegistry to fall back to inline CSS (keeping the UI functional).
   #
@@ -32,7 +33,7 @@ module StyleCapsule
   #   StyleCapsule::CssFileWriter.configure(
   #     output_dir: Rails.root.join(StyleCapsule::CssFileWriter::DEFAULT_OUTPUT_DIR),
   #     filename_pattern: ->(component_class, capsule_id) { "capsule-#{capsule_id}.css" },
-  #     fallback_dir: "/tmp/style_capsule"  # Optional, defaults to /tmp/style_capsule
+  #     fallback_dir: StyleCapsule::CssFileWriter::FALLBACK_OUTPUT_DIR
   #   )
   #
   # @example Usage
@@ -74,7 +75,7 @@ module StyleCapsule
     # Default output directory for CSS files (relative to Rails root)
     DEFAULT_OUTPUT_DIR = "app/assets/builds/capsules"
     # Fallback directory for when default location is read-only (absolute path)
-    FALLBACK_OUTPUT_DIR = "/tmp/style_capsule"
+    FALLBACK_OUTPUT_DIR = File.join(Dir.tmpdir, "style_capsule-#{Process.uid}")
     # Positive cache for resolved asset-relative paths (avoids repeated File.exist? on hot path)
     FILE_PATH_CACHE_MAX = 512
 
@@ -90,7 +91,7 @@ module StyleCapsule
       #   Default: `"capsule-#{capsule_id}.css"` (capsule_id is unique and deterministic)
       # @param enabled [Boolean] Whether file writing is enabled (default: true)
       # @param fallback_dir [String, Pathname, nil] Fallback directory when default location is read-only
-      #   Default: `StyleCapsule::CssFileWriter::FALLBACK_OUTPUT_DIR` (/tmp/style_capsule)
+      #   Default: `StyleCapsule::CssFileWriter::FALLBACK_OUTPUT_DIR`
       # @example
       #   StyleCapsule::CssFileWriter.configure(
       #     output_dir: Rails.root.join(StyleCapsule::CssFileWriter::DEFAULT_OUTPUT_DIR),

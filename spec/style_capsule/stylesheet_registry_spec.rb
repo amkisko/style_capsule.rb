@@ -1,10 +1,13 @@
 # frozen_string_literal: true
 
+require "rexml/document"
+
 RSpec.describe StyleCapsule::StylesheetRegistry do
   before do
     # Clear both request-scoped inline CSS, request-scoped files, and process-wide manifest
     described_class.clear
     described_class.clear_manifest
+    described_class.clear_inline_cache
   end
 
   describe ".normalize_namespace" do
@@ -281,6 +284,21 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
     end
   end
 
+  describe "inline cache bound" do
+    before { described_class.clear_inline_cache }
+
+    it "drops the oldest entry when the cache is full" do
+      max = described_class::MAX_INLINE_CACHE_ENTRIES
+      max.times do |i|
+        described_class.cache_inline_css("k#{i}", ".c#{i}{}", cache_strategy: :time, cache_ttl: 3600)
+      end
+      described_class.cache_inline_css("overflow", ".overflow{}", cache_strategy: :time, cache_ttl: 3600)
+
+      expect(described_class.cached_inline("k0", cache_strategy: :time, cache_ttl: 3600)).to be_nil
+      expect(described_class.cached_inline("overflow", cache_strategy: :time, cache_ttl: 3600)).to eq(".overflow{}")
+    end
+  end
+
   describe ".clear_inline_cache" do
     it "clears specific cache key" do
       cache_key = "test_key"
@@ -433,6 +451,28 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
       expect(result).to include('data-turbo-track="reload"')
     end
 
+    it "escapes quotes in fallback option values" do
+      stylesheet = {file_path: "stylesheets/test", options: {"data-x": 'reload" onload="alert(1)'}}
+      result = described_class.send(:render_file_stylesheet, stylesheet, nil)
+      link = REXML::Document.new(result.sub(/>\z/, "/>")).root
+      expect(link.attributes["onload"]).to be_nil
+      expect(link.attributes["data-x"]).to eq('reload" onload="alert(1)')
+    end
+
+    it "keeps the asset href when options include href" do
+      stylesheet = {file_path: "stylesheets/test", options: {href: "javascript:alert(1)"}}
+      result = described_class.send(:render_file_stylesheet, stylesheet, nil)
+      expect(result).not_to include("javascript:")
+      expect(result).to include("/assets/stylesheets/test.css")
+    end
+
+    it "omits event handler options from fallback HTML" do
+      stylesheet = {file_path: "stylesheets/test", options: {onload: "alert(1)", media: "print"}}
+      result = described_class.send(:render_file_stylesheet, stylesheet, nil)
+      expect(result).not_to include("onload")
+      expect(result).to include('media="print"')
+    end
+
     it "falls back when view_context doesn't respond to stylesheet_link_tag" do
       view_context = double("ViewContext")
       allow(view_context).to receive(:respond_to?).with(:stylesheet_link_tag).and_return(false)
@@ -477,6 +517,13 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
       result = described_class.send(:render_inline_stylesheet, stylesheet, view_context)
       expect(result).to include('<style type="text/css">')
       expect(result).to include(css)
+    end
+
+    it "rejects inline CSS that would close the style tag" do
+      stylesheet = {css_content: ".x { color: red; } </style><script>alert(1)</script>"}
+      expect {
+        described_class.send(:render_inline_stylesheet, stylesheet, nil)
+      }.to raise_error(ArgumentError, /style element closer/)
     end
   end
 

@@ -1,6 +1,6 @@
 # style_capsule
 
-[![Gem Version](https://badge.fury.io/rb/style_capsule.svg?v=2.0.0)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/amkisko/style_capsule.rb/graph/badge.svg?token=2U6NXJOVVM)](https://app.codecov.io/github/amkisko/style_capsule.rb)
+[![Gem Version](https://badge.fury.io/rb/style_capsule.svg?v=2.0.1)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/amkisko/style_capsule.rb/graph/badge.svg?token=2U6NXJOVVM)](https://app.codecov.io/github/amkisko/style_capsule.rb)
 
 CSS scoping extension for Ruby components. Provides attribute-based style encapsulation for Phlex, ViewComponent, and ERB templates to prevent style leakage between components. Works with Rails and can be used standalone in other Ruby frameworks (Sinatra, Hanami, etc.) or plain Ruby scripts. Includes configurable caching strategies for optimal performance.
 
@@ -256,7 +256,7 @@ By default, `StyleCapsule::HeadInjectionMiddleware` appends pending request-scop
 config.style_capsule.head_injection_middleware = false
 ```
 
-The middleware skips chunked responses (`Transfer-Encoding: chunked`) and does not buffer the body when no pending request-scoped stylesheets remain. For ActionController::Live, SSE, or other streaming HTML, disable it and inject manually with `StyleCapsule::StylesheetRegistry.inject_pending_head_stylesheets` if needed.
+The middleware skips chunked responses (`Transfer-Encoding: chunked`) and does not buffer the body when no pending request-scoped stylesheets remain. When it does rewrite, it buffers the full 2xx HTML body in memory. For ActionController::Live, SSE, or other streaming HTML, disable it and inject manually with `StyleCapsule::StylesheetRegistry.inject_pending_head_stylesheets` if needed.
 
 ## Caching Strategies
 
@@ -317,11 +317,11 @@ StyleCapsule::CssFileWriter.configure(
   filename_pattern: ->(component_class, capsule_id) {
     "capsule-#{capsule_id}.css"
   },
-  fallback_dir: "/tmp/style_capsule"  # Optional, defaults to /tmp/style_capsule
+  fallback_dir: StyleCapsule::CssFileWriter::FALLBACK_OUTPUT_DIR
 )
 ```
 
-**Fallback Directory:** In production environments where the app directory is read-only (e.g., Docker containers), StyleCapsule automatically falls back to writing files to `/tmp/style_capsule` when the default location is not writable. When using the fallback directory, the gem gracefully falls back to inline CSS rendering, keeping the UI fully functional.
+**Fallback Directory:** In production environments where the app directory is read-only (e.g., Docker containers), StyleCapsule automatically falls back to writing files under a per-user directory in `Dir.tmpdir` when the default location is not writable. When using the fallback directory, the gem gracefully falls back to inline CSS rendering, keeping the UI fully functional.
 
 **Precompilation:**
 
@@ -452,9 +452,9 @@ end
 
 ## Requirements
 
-- Ruby >= 3.0
-- Rails >= 6.0, < 9.0 (optional, for Rails integration)
-- ActiveSupport >= 6.0, < 9.0 (optional, for Rails integration)
+- Ruby >= 3.4
+- Rails >= 7.0, < 9.0 (optional, for Rails integration)
+- ActiveSupport >= 7.0, < 9.0 (optional, for Rails integration)
 
 **Note**: The gem can be used without Rails! See [Non-Rails Support](#non-rails-support) below.
 
@@ -513,9 +513,9 @@ gem push style_capsule-*.gem
 
 StyleCapsule includes security protections:
 - Path traversal protection
-- Input validation
+- Capsule id and HTML attribute validation and escaping
 - Size limits (1MB per component)
-- XSS prevention via Rails' HTML escaping
+- Reject CSS that would close a style tag
 
 For detailed security information, see [SECURITY.md](SECURITY.md).
 
