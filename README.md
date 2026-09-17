@@ -478,11 +478,11 @@ bundle install
 bundle exec appraisal install
 
 # Run tests
-bundle exec rspec
+bundle exec polyrun parallel-rspec --workers 5 --merge-failures
 
 # Run tests for all Rails versions
-bundle exec appraisal rails72 rspec
-bundle exec appraisal rails8ruby34 rspec
+bundle exec appraisal rails72 polyrun parallel-rspec --workers 5 --merge-failures
+bundle exec appraisal rails8ruby34 polyrun parallel-rspec --workers 5 --merge-failures
 
 # Linting
 bundle exec standardrb --fix

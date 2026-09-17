@@ -1,12 +1,12 @@
 # Running Tests
 
-## Using rspec
+## Using polyrun
 
-All tests should be run using `bundle exec rspec`
+Run the full suite with polyrun so workers, coverage, and JUnit merge stay on the same contract as CI.
 
 ```bash
 # Run all tests
-bundle exec rspec
+bundle exec polyrun parallel-rspec --workers 5 --merge-failures
 
 # Run with fail-fast (stop on first failure)
 bundle exec rspec --fail-fast
@@ -14,15 +14,14 @@ bundle exec rspec --fail-fast
 # For verbose output
 DEBUG=1 bundle exec rspec
 
-# Show zero coverage lines
-SHOW_ZERO_COVERAGE=1 bundle exec rspec
-
 # Run single spec file at exact line number
 DEBUG=1 bundle exec rspec spec/style_capsule/css_processor_spec.rb:10
 
 # Run with verbose logging
 DEBUG=1 DEVLOG_ENABLED=1 DEVLOG=1 LOGLOC=1 bundle exec rspec
 ```
+
+A focused file or line stays on `bundle exec rspec`. Coverage is Polyrun (`POLYRUN_COVERAGE=1`); `polyrun report-coverage` writes the merged report.
 
 ## Test Structure
 
