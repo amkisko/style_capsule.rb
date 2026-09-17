@@ -34,9 +34,9 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "polyrun", ">= 2.2.0"
   spec.add_development_dependency "webmock", "~> 3"
   spec.add_development_dependency "rake", "~> 13"
-  spec.add_development_dependency "simplecov", "~> 0.22"
+  spec.add_development_dependency "simplecov", "~> 1.3"
   spec.add_development_dependency "rspec_junit_formatter", "~> 0.6"
-  spec.add_development_dependency "simplecov-cobertura", "~> 3"
+  spec.add_development_dependency "simplecov-cobertura", "~> 4"
   spec.add_development_dependency "standard", "~> 1.52"
   spec.add_development_dependency "standard-custom", "~> 1.0"
   spec.add_development_dependency "standard-performance", "~> 1.8"
@@ -46,7 +46,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rubocop-rspec", "~> 3.8"
   spec.add_development_dependency "rubocop-thread_safety", "~> 0.7"
   spec.add_development_dependency "appraisal", "~> 2"
-  spec.add_development_dependency "rbs", "~> 3"
+  spec.add_development_dependency "rbs", "~> 4"
   spec.add_development_dependency "phlex-rails", "~> 2.0"  # For testing Phlex integration
   spec.add_development_dependency "view_component", "~> 4.0"  # For testing ViewComponent integration
 end
