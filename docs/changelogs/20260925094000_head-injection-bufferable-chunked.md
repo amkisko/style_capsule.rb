@@ -14,11 +14,12 @@ Pending request-scoped stylesheet tags reach head on bufferable chunked HTML. Tr
 
 ## Next
 
-Cut a patch release when ready to publish. Confirm consumers that relied on the old skip still expect streaming bodies without to_ary.
+Shipped in 2.0.2. Confirm consumers that relied on the old skip still expect streaming bodies without to_ary.
 
 ## Source
 
 lib/style_capsule/head_injection_middleware.rb
 spec/style_capsule/head_injection_middleware_spec.rb
-CHANGELOG.md Unreleased
+CHANGELOG.md 2.0.2
 README.md Late head injection
+Release 2.0.2.

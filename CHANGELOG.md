@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## 2.0.2 (2026-09-25)
 
 - Fix `HeadInjectionMiddleware` dropping pending stylesheets on bufferable chunked HTML
 - Inject when the Rack body responds to `to_ary`; skip only non-bufferable streaming bodies
@@ -8,7 +8,6 @@
 - Fail closed when CSS would close a style tag before it is written into HTML
 - Escape allowed attributes on the non-Rails stylesheet link fallback
 - Bound the inline stylesheet cache
-- Run lint and tests on pull requests
 - Align documented Ruby and Rails floors with the gemspec
 
 ## 2.0.1 (2026-07-03)
