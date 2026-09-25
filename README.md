@@ -4,6 +4,8 @@
 
 CSS scoping extension for Ruby components. Provides attribute-based style encapsulation for Phlex, ViewComponent, and ERB templates to prevent style leakage between components. Works with Rails and can be used standalone in other Ruby frameworks (Sinatra, Hanami, etc.) or plain Ruby scripts. Includes configurable caching strategies for optimal performance.
 
+Design changes go through `rfcs/` (RFC 0001).
+
 ## Installation
 
 Add to your Gemfile:
