@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fix `HeadInjectionMiddleware` dropping pending stylesheets on bufferable chunked HTML
+- Inject when the Rack body responds to `to_ary`; skip only non-bufferable streaming bodies
+- After rewrite, set `Content-Length` and remove `Transfer-Encoding`
 - Fail closed when CSS would close a style tag before it is written into HTML
 - Escape allowed attributes on the non-Rails stylesheet link fallback
 - Bound the inline stylesheet cache

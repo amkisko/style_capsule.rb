@@ -32,8 +32,11 @@ module StyleCapsule
       injected_body = StylesheetRegistry.inject_pending_head_stylesheets(body, view_context)
       return [status, headers, response] if injected_body.equal?(body)
 
+      close_response(response)
+
       headers = headers.dup
-      headers["Content-Length"] = injected_body.bytesize.to_s if headers.key?("Content-Length")
+      headers.delete("Transfer-Encoding")
+      headers["Content-Length"] = injected_body.bytesize.to_s
 
       [status, headers, [injected_body]]
     end
@@ -41,15 +44,20 @@ module StyleCapsule
     def inject_response?(status, headers, response)
       return false unless SUCCESS_STATUS.cover?(status)
       return false unless html_content_type?(headers["Content-Type"])
-      return false if chunked_response?(headers)
-      return false if response.respond_to?(:to_ary) && response.to_ary == [""]
+      return false unless bufferable_body?(response)
+      return false if empty_body?(response)
 
       true
     end
 
-    def chunked_response?(headers)
-      transfer_encoding = headers["Transfer-Encoding"]
-      transfer_encoding&.match?(/chunked/i)
+    # Rack 3: +to_ary+ means the body may be buffered without changing application behaviour.
+    # Streaming / Live bodies omit +to_ary+; leave those alone even when Transfer-Encoding is chunked.
+    def bufferable_body?(response)
+      response.respond_to?(:to_ary)
+    end
+
+    def empty_body?(response)
+      response.to_ary == [""]
     end
 
     def html_content_type?(content_type)
@@ -62,6 +70,10 @@ module StyleCapsule
       parts = []
       response.each { |part| parts << part.to_s }
       parts.join
+    end
+
+    def close_response(response)
+      response.close if response.respond_to?(:close)
     end
 
     def view_context_for(env)

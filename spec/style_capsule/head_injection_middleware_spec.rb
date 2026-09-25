@@ -87,7 +87,23 @@ RSpec.describe StyleCapsule::HeadInjectionMiddleware do
     expect(headers["Content-Length"]).to eq(html.bytesize.to_s)
   end
 
-  it "passes through chunked html responses without buffering" do
+  it "injects pending stylesheets into bufferable chunked html responses" do
+    capturing_app = lambda do |_env|
+      StyleCapsule::StylesheetRegistry.register("stylesheets/user/order_history_component", namespace: :user)
+      [200, {"Content-Type" => "text/html", "Transfer-Encoding" => "chunked"}, [body]]
+    end
+
+    _status, headers, response = described_class.new(capturing_app).call(Rack::MockRequest.env_for("/"))
+    html = read_response_body(response)
+
+    expect(html).to include("/assets/stylesheets/user/order_history_component.css")
+    expect(html.index("/assets/stylesheets/user/order_history_component.css")).to be < html.index("<body>")
+    expect(headers["Transfer-Encoding"]).to be_nil
+    expect(headers["Content-Length"]).to eq(html.bytesize.to_s)
+    expect(StyleCapsule::StylesheetRegistry.any?).to be false
+  end
+
+  it "passes through non-bufferable streaming html without consuming the body" do
     seen = []
     streaming_app = lambda do |_env|
       StyleCapsule::StylesheetRegistry.register("stylesheets/user/order_history_component", namespace: :user)
@@ -101,6 +117,7 @@ RSpec.describe StyleCapsule::HeadInjectionMiddleware do
     expect(seen).to be_empty
     expect(headers["Transfer-Encoding"]).to eq("chunked")
     expect(response).not_to be_a(Array)
+    expect(StyleCapsule::StylesheetRegistry.pending_head_stylesheets?).to be true
   end
 
   it "passes through html when no pending request-scoped stylesheets remain" do

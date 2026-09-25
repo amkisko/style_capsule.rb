@@ -256,7 +256,7 @@ By default, `StyleCapsule::HeadInjectionMiddleware` appends pending request-scop
 config.style_capsule.head_injection_middleware = false
 ```
 
-The middleware skips chunked responses (`Transfer-Encoding: chunked`) and does not buffer the body when no pending request-scoped stylesheets remain. When it does rewrite, it buffers the full 2xx HTML body in memory. For ActionController::Live, SSE, or other streaming HTML, disable it and inject manually with `StyleCapsule::StylesheetRegistry.inject_pending_head_stylesheets` if needed.
+The middleware only rewrites bufferable bodies (Rack bodies that respond to `to_ary`). Chunked HTML with a bufferable body is injected, then returned with `Content-Length` and without `Transfer-Encoding`. Non-bufferable streaming bodies (ActionController::Live, SSE, and similar) are left alone; disable the middleware and inject manually with `StyleCapsule::StylesheetRegistry.inject_pending_head_stylesheets` if needed. The middleware does not buffer when no pending request-scoped stylesheets remain. When it does rewrite, it holds the full 2xx HTML body in memory.
 
 ## Caching Strategies
 
