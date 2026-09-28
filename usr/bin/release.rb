@@ -16,7 +16,7 @@ def execute_command(command)
 end
 
 execute_command("bundle")
-execute_command("bundle exec appraisal generate")
+execute_command("bundle exec appraisal install")
 execute_command("POLYRUN_COVERAGE=1 bundle exec polyrun parallel-rspec --workers 5 --merge-failures 2>&1 | tee tmp/polyrun-rspec.log")
 
 puts "Tests passed. Checking git status..."
