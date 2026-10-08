@@ -43,7 +43,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rubocop-rspec", "~> 3.8"
   spec.add_development_dependency "rubocop-thread_safety", "~> 0.7"
   spec.add_development_dependency "appraisal", "~> 2"
-  spec.add_development_dependency "rbs", "~> 3"
+  spec.add_development_dependency "rbs", "~> 4"
   spec.add_development_dependency "phlex-rails", "~> 2.0"  # For testing Phlex integration
   spec.add_development_dependency "view_component", "~> 4.0"  # For testing ViewComponent integration
 end
