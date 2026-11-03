@@ -48,6 +48,16 @@ module StyleCapsule
 
     private
 
+    def warn_file_cache_fallback(component_class)
+      return if component_class.instance_variable_get(:@_style_capsule_file_cache_warned)
+
+      component_class.instance_variable_set(:@_style_capsule_file_cache_warned, true)
+      label = component_class.name
+      label = component_class.inspect if label.nil? || label.empty?
+      warn "[StyleCapsule] :file cache strategy requires class-method component_styles; " \
+           "falling back to :none for #{label}"
+    end
+
     # Check if component defines instance method styles
     #
     # @return [Boolean]

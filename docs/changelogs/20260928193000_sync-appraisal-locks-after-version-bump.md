@@ -1,3 +1,7 @@
+## Participants
+
+Andrei Makarov (@amkisko)
+
 ## Decisions
 
 Sync appraisal lockfiles to style_capsule 2.0.2 after the release bump left gemfiles/*.gemfile.lock on 2.0.1. Change usr/bin/release.rb to run appraisal install so path-gem version changes update those locks before the next push.

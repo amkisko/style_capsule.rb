@@ -81,5 +81,5 @@ stylesheets = StyleCapsule::StylesheetRegistry.request_inline_stylesheets
 
 ## Configuration entry points
 
-- **`style_capsule`** — Preferred class-level DSL for namespace, cache strategy, CSS scoping (`:selector_patching` or `:nesting`), head rendering, and wrapper `tag:`.
-- **`stylesheet_registry`** — Older alias that enables head rendering and cache options; new code should prefer `style_capsule` for a single configuration surface.
+- `style_capsule` - Class-level DSL for namespace, cache strategy, CSS scoping (`:selector_patching` or `:nesting`), head rendering, and wrapper `tag:`.
+- `stylesheet_registry` - Older alias for head rendering and cache options; use `style_capsule` in new code.

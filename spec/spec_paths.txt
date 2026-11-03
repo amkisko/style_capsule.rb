@@ -1,5 +1,6 @@
 spec/integration/phlex_integration_spec.rb
 spec/integration/view_component_integration_spec.rb
+spec/release_version_check_spec.rb
 spec/style_capsule/asset_path_spec.rb
 spec/style_capsule/class_registry_spec.rb
 spec/style_capsule/component_builder_spec.rb

@@ -63,7 +63,7 @@ RSpec.describe StyleCapsule::HeadInjectionMiddleware do
     expect(read_response_body(response)).to eq('{"ok":true}')
   end
 
-  it "passes through html without a head element" do
+  it "passes through html without a head element and clears pending stylesheets" do
     fragment_app = lambda do |_env|
       StyleCapsule::StylesheetRegistry.register("stylesheets/user/order_history_component", namespace: :user)
       [200, {"Content-Type" => "text/html"}, ["<div>fragment</div>"]]
@@ -72,6 +72,7 @@ RSpec.describe StyleCapsule::HeadInjectionMiddleware do
     _status, _headers, response = described_class.new(fragment_app).call(Rack::MockRequest.env_for("/"))
 
     expect(read_response_body(response)).to eq("<div>fragment</div>")
+    expect(StyleCapsule::StylesheetRegistry.pending_head_stylesheets?).to be false
   end
 
   it "updates Content-Length when injection changes the body" do

@@ -1,8 +1,8 @@
 # style_capsule
 
-[![Gem Version](https://badge.fury.io/rb/style_capsule.svg?v=2.0.2)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/amkisko/style_capsule.rb/graph/badge.svg?token=2U6NXJOVVM)](https://app.codecov.io/github/amkisko/style_capsule.rb)
+[![Gem Version](https://badge.fury.io/rb/style_capsule.svg?v=2.0.3)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/amkisko/style_capsule.rb/graph/badge.svg?token=2U6NXJOVVM)](https://app.codecov.io/github/amkisko/style_capsule.rb)
 
-CSS scoping extension for Ruby components. Provides attribute-based style encapsulation for Phlex, ViewComponent, and ERB templates to prevent style leakage between components. Works with Rails and can be used standalone in other Ruby frameworks (Sinatra, Hanami, etc.) or plain Ruby scripts. Includes configurable caching strategies for optimal performance.
+CSS scoping for Ruby components. Attribute selectors encapsulate styles for Phlex, ViewComponent, and ERB so rules stay inside the component wrapper. Works with Rails and standalone in other Ruby frameworks (Sinatra, Hanami, and similar) or plain Ruby. Cache strategies: none, time-based, custom proc, and file-based.
 
 Design changes go through `rfcs/` (RFC 0001).
 
@@ -18,15 +18,15 @@ Then run `bundle install`.
 
 ## Features
 
-- **Attribute-based CSS scoping** (no class name renaming)
-- **Phlex, ViewComponent, and ERB support** with automatic Rails integration
-- **Per-component-type scope IDs** (shared across instances)
-- **CSS Nesting support** (optional, more performant, requires modern browsers)
-- **Stylesheet registry** with thread-safe head rendering, namespace support, and compatibility with Propshaft and other asset bundlers
-- **Multiple cache strategies**: none, time-based, custom proc, and file-based (HTTP caching)
-- **Comprehensive instrumentation** via ActiveSupport::Notifications for monitoring and metrics
-- **Fallback directory support** for read-only filesystems (e.g., Docker containers)
-- **Security protections**: path traversal protection, input validation, size limits
+- Attribute-based CSS scoping (class names stay as written)
+- Phlex, ViewComponent, and ERB; Rails integration via the railtie
+- Per-component-type scope IDs (shared across instances)
+- Optional CSS nesting (`:nesting`) for browsers that support it
+- Stylesheet registry for head rendering, namespaces, and asset bundlers such as Propshaft
+- Cache strategies: none, time-based, custom proc, and file-based
+- `ActiveSupport::Notifications` events for CSS processing and file writes
+- Fallback output directory when the primary path is not writable
+- Path traversal checks, input validation, and CSS size limits
 
 ## Usage
 
@@ -103,8 +103,8 @@ StyleCapsule supports two CSS scoping strategies:
    - Better browser support (all modern browsers)
    - Output: `[data-capsule="abc123"] .section { color: red; }`
 
-2. **CSS Nesting (optional)**: Wraps entire CSS in `[data-capsule="..."] { ... }`
-   - More performant (no CSS parsing needed)
+2. **CSS Nesting (optional)**: Wraps nestable rules in `[data-capsule="..."] { ... }`
+   - Skips per-selector rewrite; hoists `@keyframes` / `@font-face` and similar to top level
    - Requires CSS nesting support (Chrome 112+, Firefox 117+, Safari 16.5+)
    - Output: `[data-capsule="abc123"] { .section { color: red; } }`
 
@@ -145,7 +145,7 @@ MyComponent.clear_css_cache
 
 ## Stylesheet Registry
 
-For better performance, register styles for head rendering instead of rendering `<style>` tags in the body. Use the unified `style_capsule` method to configure all settings:
+Register styles for head rendering when the layout should emit links or shared style tags instead of body `<style>` tags. Configure with `style_capsule`:
 
 ```ruby
 class MyComponent < ApplicationComponent
@@ -323,7 +323,7 @@ StyleCapsule::CssFileWriter.configure(
 )
 ```
 
-**Fallback Directory:** In production environments where the app directory is read-only (e.g., Docker containers), StyleCapsule automatically falls back to writing files under a per-user directory in `Dir.tmpdir` when the default location is not writable. When using the fallback directory, the gem gracefully falls back to inline CSS rendering, keeping the UI fully functional.
+**Fallback Directory:** When the primary output directory is not writable (for example a read-only app tree in a container), writes go under a per-user directory in `Dir.tmpdir`. If that write also fails, rendering uses inline CSS.
 
 **Precompilation:**
 
@@ -338,7 +338,7 @@ Files are automatically built during `bin/rails assets:precompile`.
 
 ## Instrumentation
 
-StyleCapsule provides comprehensive instrumentation via `ActiveSupport::Notifications` for monitoring CSS processing and file writing operations. All instrumentation is zero-overhead when no subscribers are present.
+Subscribe to `ActiveSupport::Notifications` for CSS processing and file write events. Metric payloads are built only when a subscriber is present.
 
 ### Available Events
 
@@ -469,9 +469,9 @@ For setup examples, API notes, and the relationship between `style_capsule` and 
 ## How It Works
 
 1. **Scope ID Generation**: Each component class gets a unique scope ID based on its class name (shared across all instances)
-2. **CSS Rewriting**: CSS selectors are rewritten to include `[data-capsule="..."]` attribute selectors
-3. **HTML Wrapping**: Component content is automatically wrapped in a scoped element
-4. **No Class Renaming**: Class names remain unchanged (unlike Shadow DOM)
+2. **CSS Rewriting**: CSS selectors gain `[data-capsule="..."]` attribute selectors (or a nesting wrapper)
+3. **HTML Wrapping**: Component content is wrapped in a scoped element
+4. **Class names**: Class names in CSS and markup stay as written
 
 ## Development
 

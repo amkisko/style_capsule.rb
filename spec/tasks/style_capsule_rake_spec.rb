@@ -487,13 +487,18 @@ RSpec.describe "style_capsule rake tasks" do
 
         # Mock ViewComponent to raise an error when checking inheritance
         # rubocop:disable RSpec/AnyInstance -- must intercept inheritance checks across anonymous component classes
-        allow_any_instance_of(Class).to receive(:<).and_call_original
-        allow_any_instance_of(Class).to receive(:<).with(ViewComponent::Base) do |klass|
-          # Simulate a loading error for some classes
-          if klass.name&.include?("ErrorComponent")
-            raise StandardError, "ViewComponent loading error"
+        original_less_than = Class.instance_method(:<)
+        view_component_base = ViewComponent::Base
+        allow_any_instance_of(Class).to receive(:<) do |klass, parent|
+          if parent == view_component_base
+            # Simulate a loading error for some classes
+            if klass.name&.include?("ErrorComponent")
+              raise StandardError, "ViewComponent loading error"
+            else
+              klass.superclass == view_component_base || klass.ancestors.include?(view_component_base)
+            end
           else
-            klass.superclass == ViewComponent::Base || klass.ancestors.include?(ViewComponent::Base)
+            original_less_than.bind_call(klass, parent)
           end
         end
         # rubocop:enable RSpec/AnyInstance

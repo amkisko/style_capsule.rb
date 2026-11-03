@@ -61,7 +61,10 @@ module StyleCapsule
     end
 
     def html_content_type?(content_type)
-      return false if content_type.blank?
+      # Core path must not call ActiveSupport String#blank?
+      # rubocop:disable Rails/Blank -- standalone hosts may lack ActiveSupport
+      return false if content_type.nil? || content_type.empty?
+      # rubocop:enable Rails/Blank
 
       content_type.split(";", 2).first.to_s.strip.match?(HTML_CONTENT_TYPE)
     end

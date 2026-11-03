@@ -113,7 +113,7 @@ module StyleCapsule
           file_path
         rescue ArgumentError, NoMethodError => e
           # Component requires arguments or has dependencies - skip it (common for ViewComponent with required kwargs)
-          warn "[style_capsule] Skipped #{component_class.name} in style_capsule:build — #{e.class}: #{e.message}"
+          warn "[style_capsule] Skipped #{component_class.name} in style_capsule:build - #{e.class}: #{e.message}"
           output_proc&.call("Skipped #{component_class.name}: #{e.message}")
           nil
         end

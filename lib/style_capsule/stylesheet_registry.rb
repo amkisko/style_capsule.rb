@@ -728,10 +728,16 @@ module StyleCapsule
       return html if pending_stylesheets.empty?
 
       closing_head_index = html.match(%r{</head>}i)&.begin(0)
-      return html unless closing_head_index
+      unless closing_head_index
+        clear
+        return html
+      end
 
       tags = render_stylesheet_tags(pending_stylesheets, view_context)
-      return html if tags.empty?
+      if tags.empty?
+        clear
+        return html
+      end
 
       injected = html.dup
       injected.insert(closing_head_index, "#{tags}\n")

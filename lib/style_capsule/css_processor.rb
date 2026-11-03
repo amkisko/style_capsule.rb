@@ -7,14 +7,24 @@ module StyleCapsule
   #
   # Supports two scoping strategies:
   # 1. Selector patching (default): Adds [data-capsule="..."] prefix to each selector
-  #    - Better browser support (all modern browsers)
+  #    - Wider browser support (all modern browsers)
   #    - Requires CSS parsing and transformation
-  # 2. CSS nesting (optional): Wraps entire CSS in [data-capsule="..."] { ... }
-  #    - More performant (no parsing needed)
+  # 2. CSS nesting (optional): Wraps style rules in [data-capsule="..."] { ... }
+  #    - Avoids per-selector rewrite
   #    - Requires CSS nesting support (Chrome 112+, Firefox 117+, Safari 16.5+)
+  #    - Hoists non-nestable at-rules (@keyframes, @font-face, @import, ...) to top level
+  # rubocop:disable Metrics/ModuleLength -- processor owns patching, nesting hoist, and validation
   module CssProcessor
     # Maximum CSS content size (1MB) to prevent DoS attacks
     MAX_CSS_SIZE = 1_000_000
+
+    # At-rules whose inner selectors must not receive attribute scoping
+    NON_SCOPING_AT_RULES = %w[keyframes font-face property].freeze
+
+    # At-rules that must stay at the top level under CSS nesting
+    HOISTABLE_AT_RULES = %w[
+      keyframes font-face import charset namespace property
+    ].freeze
 
     # Rewrite CSS selectors to include attribute-based scoping
     #
@@ -26,25 +36,17 @@ module StyleCapsule
     #   [data-capsule="a1b2c3d4"] .section { color: red; }
     #   [data-capsule="a1b2c3d4"] .heading:hover { opacity: 0.8; }
     #
-    # This approach uses attribute selectors (similar to Angular's Emulated View Encapsulation)
-    # instead of renaming classes, ensuring styles only apply within scoped components.
-    #
-    # Simple approach:
-    # - Strips CSS comments first to avoid interference
-    # - Finds selectors before opening braces and prefixes them
-    # - Handles @media queries (preserves them, scopes inner selectors)
-    # - Handles :host and :host-context (component-scoped selectors)
+    # Uses attribute selectors instead of renaming classes, so styles apply only
+    # within scoped components. Leaves @keyframes / @font-face / @property steps alone.
     #
     # @param css_string [String] Original CSS content
     # @param capsule_id [String] The capsule ID to use in attribute selector
     # @param component_class [Class, String, nil] Optional component class for instrumentation
     # @return [String] CSS with scoped selectors
     # @raise [ArgumentError] If CSS content exceeds maximum size or capsule_id is invalid
-    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- selector patching walks CSS rules
     def self.scope_selectors(css_string, capsule_id, component_class: nil)
       return css_string if css_string.nil? || css_string.strip.empty?
 
-      # Validate CSS size to prevent DoS attacks
       if css_string.bytesize > MAX_CSS_SIZE
         raise ArgumentError, "CSS content exceeds maximum size of #{MAX_CSS_SIZE} bytes (got #{css_string.bytesize} bytes)"
       end
@@ -52,72 +54,22 @@ module StyleCapsule
       reject_style_element_breakout!(css_string)
       validate_capsule_id!(capsule_id)
 
-      # Instrument CSS processing with timing and size metrics
       Instrumentation.instrument_css_processing(
         strategy: :selector_patching,
         component_class: component_class || "Unknown",
         capsule_id: capsule_id,
         css_content: css_string
       ) do
-        css = css_string.dup
         capsule_attr = %([data-capsule="#{capsule_id}"])
-
-        # Strip CSS comments so they do not interfere with selector matching.
-        # Comments are removed from the output (typical for production CSS).
-        css_without_comments = strip_comments(css)
-
-        # Process CSS rule by rule
-        # Match: selector(s) { ... }
-        # Pattern: (start or closing brace) + (whitespace) + (selector text) + (opening brace)
-        # Note: Uses non-greedy quantifier ([^{}@]+?) to minimize backtracking
-        # MAX_CSS_SIZE limit (1MB) mitigates ReDoS risk from malicious input
-        css_without_comments.gsub!(/(^|\})(\s*)([^{}@]+?)(\{)/m) do |_|
-          prefix = Regexp.last_match(1)  # Previous closing brace or start
-          whitespace = Regexp.last_match(2)  # Whitespace between rules
-          selectors_raw = Regexp.last_match(3)  # The selector group
-          selectors = selectors_raw.strip  # Stripped for processing
-          opening_brace = Regexp.last_match(4)  # The opening brace
-
-          # Skip at-rules (@media, @keyframes, etc.) - they should not be scoped at top level
-          next "#{prefix}#{whitespace}#{selectors_raw}#{opening_brace}" if selectors.start_with?("@")
-
-          # Skip if already scoped (avoid double-scoping)
-          next "#{prefix}#{whitespace}#{selectors_raw}#{opening_brace}" if selectors_raw.include?("[data-capsule=")
-
-          # Skip empty selectors
-          next "#{prefix}#{whitespace}#{selectors_raw}#{opening_brace}" if selectors.empty?
-
-          # Split selectors by comma and scope each one
-          scoped_selectors = selectors.split(",").map do |selector|
-            selector = selector.strip
-            next selector if selector.empty?
-
-            # Handle special component-scoped selectors (:host, :host-context)
-            if selector.start_with?(":host")
-              selector = selector
-                .gsub(/^:host-context\(([^)]+)\)/, "#{capsule_attr} \\1")
-                .gsub(/^:host\(([^)]+)\)/, "#{capsule_attr}\\1")
-                .gsub(/^:host\b/, capsule_attr)
-              selector
-            else
-              # Add capsule attribute with space before selector for descendant matching
-              # This ensures styles apply to elements inside the scoped wrapper
-              "#{capsule_attr} #{selector}"
-            end
-          end.compact.join(", ")
-
-          "#{prefix}#{whitespace}#{scoped_selectors}#{opening_brace}"
-        end
-
-        css_without_comments
+        patch_selectors(strip_comments(css_string.dup), capsule_attr)
       end
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
-    # Scope CSS using CSS nesting (wraps entire CSS in [data-capsule] { ... })
+    # Scope CSS using CSS nesting (wraps nestable rules in [data-capsule] { ... })
     #
-    # This approach is more performant as it requires no CSS parsing or transformation.
-    # However, it requires CSS nesting support in browsers (Chrome 112+, Firefox 117+, Safari 16.5+).
+    # Avoids per-selector rewrite. Requires CSS nesting support in browsers
+    # (Chrome 112+, Firefox 117+, Safari 16.5+). Non-nestable at-rules are written
+    # before the wrapper so @keyframes and @font-face stay valid.
     #
     # Transforms:
     #   .section { color: red; }
@@ -132,12 +84,12 @@ module StyleCapsule
     # @param css_string [String] Original CSS content
     # @param capsule_id [String] The capsule ID to use in attribute selector
     # @param component_class [Class, String, nil] Optional component class for instrumentation
-    # @return [String] CSS wrapped in nesting selector
+    # @return [String] CSS with nesting wrapper and hoisted at-rules
     # @raise [ArgumentError] If CSS content exceeds maximum size or capsule_id is invalid
+    # rubocop:disable Metrics/AbcSize -- size check, breakout, instrument, then hoist and wrap
     def self.scope_with_nesting(css_string, capsule_id, component_class: nil)
       return css_string if css_string.nil? || css_string.strip.empty?
 
-      # Validate CSS size to prevent DoS attacks
       if css_string.bytesize > MAX_CSS_SIZE
         raise ArgumentError, "CSS content exceeds maximum size of #{MAX_CSS_SIZE} bytes (got #{css_string.bytesize} bytes)"
       end
@@ -145,27 +97,27 @@ module StyleCapsule
       reject_style_element_breakout!(css_string)
       validate_capsule_id!(capsule_id)
 
-      # Instrument CSS processing with timing and size metrics
       Instrumentation.instrument_css_processing(
         strategy: :nesting,
         component_class: component_class || "Unknown",
         capsule_id: capsule_id,
         css_content: css_string
       ) do
-        # Simply wrap the entire CSS in the capsule attribute selector
-        # No parsing or transformation needed - much more performant
         capsule_attr = %([data-capsule="#{capsule_id}"])
-        "#{capsule_attr} {\n#{css_string}\n}"
+        hoisted, nestable = hoist_top_level_at_rules(css_string)
+        parts = []
+        parts << hoisted unless hoisted.empty?
+        parts << "#{capsule_attr} {\n#{nestable}\n}" unless nestable.strip.empty?
+        parts.join("\n")
       end
     end
+    # rubocop:enable Metrics/AbcSize
 
     # Strip CSS comments (/* ... */) from the string
     #
     # @param css [String] CSS content with comments
     # @return [String] CSS content without comments
     def self.strip_comments(css)
-      # Remove /* ... */ comments (including multi-line)
-      # Use non-greedy match to handle multiple comments
       css.gsub(/\/\*.*?\*\//m, "")
     end
 
@@ -177,7 +129,10 @@ module StyleCapsule
     # @param css_string [String, nil] CSS that will be placed inside a style tag
     # @raise [ArgumentError] If the string contains a style element closer
     def self.reject_style_element_breakout!(css_string)
-      return if css_string.blank?
+      # Core path must not call ActiveSupport String#blank?
+      # rubocop:disable Rails/Blank -- standalone hosts may lack ActiveSupport
+      return if css_string.nil? || css_string.empty?
+      # rubocop:enable Rails/Blank
       return unless css_string.match?(%r{</style}i)
 
       raise ArgumentError, "CSS content must not contain a style element closer"
@@ -192,23 +147,191 @@ module StyleCapsule
         raise ArgumentError, "capsule_id must be a String (got #{capsule_id.class})"
       end
 
-      # Must not be empty (check first for clearer error message)
       if capsule_id.empty?
         raise ArgumentError, "capsule_id cannot be empty"
       end
 
-      # Capsule ID should only contain alphanumeric characters, hyphens, and underscores
-      # This prevents injection into HTML attributes
       unless capsule_id.match?(/\A[a-zA-Z0-9_-]+\z/)
         raise ArgumentError, "Invalid capsule_id: must contain only alphanumeric characters, hyphens, and underscores (got: #{capsule_id.inspect})"
       end
 
-      # Reasonable length limit
       if capsule_id.length > 100
         raise ArgumentError, "Invalid capsule_id: too long (max 100 characters, got #{capsule_id.length})"
       end
     end
 
-    private_class_method :strip_comments, :validate_capsule_id!
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity -- walks braces and at-rules in one pass
+    def self.patch_selectors(css, capsule_attr)
+      output = +""
+      index = 0
+      length = css.length
+      brace_depth = 0
+      suppress_below_depth = nil
+
+      while index < length
+        while index < length && css[index].match?(/\s/)
+          output << css[index]
+          index += 1
+        end
+        break if index >= length
+
+        if css[index] == "}"
+          output << "}"
+          index += 1
+          brace_depth -= 1
+          if !suppress_below_depth.nil? && brace_depth <= suppress_below_depth
+            suppress_below_depth = nil
+          end
+          next
+        end
+
+        selector_start = index
+        while index < length && css[index] != "{" && css[index] != "}"
+          index += 1
+        end
+
+        selectors_raw = css[selector_start...index]
+        if index >= length || css[index] == "}"
+          output << selectors_raw
+          next
+        end
+
+        selectors = selectors_raw.strip
+        at_name = selectors[/\A@([a-zA-Z-]+)/, 1]&.downcase
+        entering_non_scoping = at_name && NON_SCOPING_AT_RULES.include?(at_name) && suppress_below_depth.nil?
+
+        skip_scoping = !suppress_below_depth.nil? ||
+          selectors.start_with?("@") ||
+          selectors_raw.include?("[data-capsule=") ||
+          selectors.empty?
+
+        if skip_scoping
+          output << selectors_raw
+          if entering_non_scoping
+            suppress_below_depth = brace_depth
+          end
+        else
+          scoped_selectors = selectors.split(",").map do |selector|
+            selector = selector.strip
+            next selector if selector.empty?
+
+            if selector.start_with?(":host")
+              selector
+                .gsub(/^:host-context\(([^)]+)\)/, "#{capsule_attr} \\1")
+                .gsub(/^:host\(([^)]+)\)/, "#{capsule_attr}\\1")
+                .gsub(/^:host\b/, capsule_attr)
+            else
+              "#{capsule_attr} #{selector}"
+            end
+          end.join(", ")
+
+          leading = selectors_raw[/\A\s*/]
+          trailing = selectors_raw[/\s*\z/]
+          output << "#{leading}#{scoped_selectors}#{trailing}"
+        end
+
+        output << "{"
+        index += 1
+        brace_depth += 1
+      end
+
+      output
+    end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity -- splits top-level CSS into hoistable and nestable parts
+    def self.hoist_top_level_at_rules(css)
+      hoisted = []
+      nestable = +""
+      index = 0
+      length = css.length
+
+      while index < length
+        while index < length && css[index].match?(/\s/)
+          nestable << css[index]
+          index += 1
+        end
+        break if index >= length
+
+        if css[index] == "@"
+          at_name = css[index..][/\A@([a-zA-Z-]+)/, 1]&.downcase
+          if at_name && HOISTABLE_AT_RULES.include?(at_name)
+            block, index = read_top_level_at_rule(css, index)
+            hoisted << block.strip
+            next
+          end
+        end
+
+        rule, index = read_top_level_rule(css, index)
+        nestable << rule
+      end
+
+      [hoisted.join("\n"), nestable]
+    end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+
+    # rubocop:disable Metrics/AbcSize, Metrics/MethodLength -- semicolon vs braced at-rule forms
+    def self.read_top_level_at_rule(css, index)
+      start_index = index
+      length = css.length
+
+      while index < length && css[index] != "{" && css[index] != ";"
+        index += 1
+      end
+
+      if index < length && css[index] == ";"
+        index += 1
+        return [css[start_index...index], index]
+      end
+
+      raise ArgumentError, "Unterminated at-rule in CSS" if index >= length
+
+      index = consume_braced_block(css, index)
+      [css[start_index...index], index]
+    end
+    # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+
+    def self.read_top_level_rule(css, index)
+      start_index = index
+      length = css.length
+
+      while index < length && css[index] != "{"
+        index += 1
+      end
+
+      return [css[start_index...index], index] if index >= length
+
+      index = consume_braced_block(css, index)
+      [css[start_index...index], index]
+    end
+
+    # rubocop:disable Metrics/MethodLength -- brace depth walk with unterminated guard
+    def self.consume_braced_block(css, index)
+      length = css.length
+      raise ArgumentError, "Expected opening brace in CSS" unless css[index] == "{"
+
+      depth = 0
+      while index < length
+        case css[index]
+        when "{"
+          depth += 1
+        when "}"
+          depth -= 1
+          index += 1
+          return index if depth.zero?
+
+          next
+        end
+        index += 1
+      end
+
+      raise ArgumentError, "Unterminated CSS block"
+    end
+    # rubocop:enable Metrics/MethodLength
+
+    private_class_method :strip_comments, :validate_capsule_id!, :patch_selectors,
+      :hoist_top_level_at_rules, :read_top_level_at_rule, :read_top_level_rule,
+      :consume_braced_block
   end
+  # rubocop:enable Metrics/ModuleLength
 end

@@ -1,8 +1,12 @@
 # Engineering and dependency audit of style_capsule 2.0.1
 
-Recorded 2026-09-04. Library gem. No product UI, database, queue, or worker. Pipeline is CSS and HTML in, processor and helpers, class and thread caches, optional file writer, stylesheet registry, optional Rack head injection, HTML out.
+## Participants
+
+Andrei Makarov (@amkisko)
 
 ## Decisions
+
+Recorded 2026-09-04. Library gem. No product UI, database, queue, or worker. Pipeline is CSS and HTML in, processor and helpers, class and thread caches, optional file writer, stylesheet registry, optional Rack head injection, HTML out.
 
 This pass is an audit only. No code change, no lockfile bump, no workflow edit. Rankings follow engineering-audit order: danger, then certainty, then impact, then fix cost. Dependency-audit ran because the request named both. The published gemspec has no runtime gems. json 2.21.1 is a development lockfile pin from activesupport and rubocop, not a consumer runtime of this gem.
 

@@ -17,11 +17,11 @@ Unscoped selectors apply wherever a class name appears. Hosts need a determinist
 
 ## Guide-level explanation
 
-Call `StyleCapsule::CssProcessor.scope_selectors(css, capsule_id)` for patching, or `scope_with_nesting` for nesting. Patching turns `.section { color: red; }` into `[data-capsule="abc123"] .section { color: red; }`. Nesting wraps the block as `[data-capsule="abc123"] { .section { color: red; } }`. Component integrations generate the id and wrap markup; see RFC 0004.
+Call `StyleCapsule::CssProcessor.scope_selectors(css, capsule_id)` for patching, or `scope_with_nesting` for nesting. Patching turns `.section { color: red; }` into `[data-capsule="abc123"] .section { color: red; }`. Nesting wraps nestable rules as `[data-capsule="abc123"] { .section { color: red; } }` and writes non-nestable at-rules (`@keyframes`, `@font-face`, `@import`, and similar) before that wrapper. Component integrations generate the id and wrap markup; see RFC 0004.
 
 ## Reference-level explanation
 
-Capsule ids MUST be validated before use in attributes. CSS larger than `CssProcessor::MAX_CSS_SIZE` (1_000_000 bytes) MUST raise `ArgumentError`. CSS that would close a style element MUST be rejected before write into HTML. Comments are stripped on the patching path. Top-level at-rules such as `@media` are preserved; inner selectors are scoped. Already-scoped selectors that contain `[data-capsule=` are left alone. `:host`, `:host(...)`, and `:host-context(...)` map onto the capsule attribute. Nesting mode does not parse selectors; it wraps the whole string after the same size and breakout checks.
+Capsule ids MUST be validated before use in attributes. CSS larger than `CssProcessor::MAX_CSS_SIZE` (1_000_000 bytes) MUST raise `ArgumentError`. CSS that would close a style element MUST be rejected before write into HTML. Comments are stripped on the patching path. Top-level at-rules such as `@media` are preserved; inner selectors are scoped. Inner steps of `@keyframes`, `@font-face`, and `@property` MUST NOT receive attribute scoping. Already-scoped selectors that contain `[data-capsule=` are left alone. `:host`, `:host(...)`, and `:host-context(...)` map onto the capsule attribute. Nesting mode hoists non-nestable at-rules, then wraps the remaining nestable CSS after the same size and breakout checks.
 
 The default strategy is selector patching. Nesting is opt-in via `style_capsule scoping_strategy: :nesting` on the component (RFC 0004).
 
@@ -47,4 +47,4 @@ Angular emulated encapsulation; CSS nesting in browsers; Shadow DOM `:host`.
 
 ## Unresolved questions
 
-Whether `@keyframes` and animation names should stay unscoped forever, or gain an opt-in rename strategy in a later RFC.
+Whether animation names should gain an opt-in rename strategy in a later RFC. Keyframe steps stay unscoped under patching; non-nestable at-rules stay top-level under nesting.

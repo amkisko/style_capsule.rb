@@ -167,7 +167,7 @@ module StyleCapsule
 
         # File caching is only allowed for class method component_styles
         if cache_strategy == :file && !file_caching_allowed?
-          # Fall back to :none strategy if file caching requested but not allowed
+          warn_file_cache_fallback(self.class)
           cache_strategy = :none
           cache_ttl = nil
           cache_proc = nil

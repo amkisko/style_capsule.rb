@@ -6,9 +6,12 @@ module StyleCapsule
   end
 
   module CssProcessor
+    MAX_CSS_SIZE: Integer
+    NON_SCOPING_AT_RULES: Array[String]
+    HOISTABLE_AT_RULES: Array[String]
+
     def self.scope_selectors: (String css_string, String capsule_id, ?component_class: Class | String | nil) -> String
     def self.scope_with_nesting: (String css_string, String capsule_id, ?component_class: Class | String | nil) -> String
-    def self.strip_comments: (String css) -> String
     def self.reject_style_element_breakout!: (String | nil css_string) -> void
   end
 

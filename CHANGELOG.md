@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 2.0.3 (2026-11-03)
+
+- Leave `@keyframes` / `@font-face` / `@property` steps unscoped under selector patching
+- Hoist non-nestable at-rules outside the CSS nesting wrapper
+- Clear pending request stylesheets when head injection cannot find `</head>`
+- Replace ActiveSupport `blank?` on core CSS and content-type checks
+- Warn once when `:file` cache strategy falls back to `:none` without class-method `component_styles`
+- Fail closed when release confirmation input reaches EOF; accept case-insensitive `y`
+- Require a dated CHANGELOG heading for the release version before `gem build`
+- Run the test workflow on pull requests targeting `main`
+
 ## 2.0.2 (2026-09-25)
 
 - Fix `HeadInjectionMiddleware` dropping pending stylesheets on bufferable chunked HTML

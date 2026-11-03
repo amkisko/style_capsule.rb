@@ -350,6 +350,15 @@ RSpec.describe StyleCapsule::StylesheetRegistry do
       expect(result).to include(".pending { color: green; }")
       expect(result.index("<style")).to be < result.index("<body>")
     end
+
+    it "clears pending request stylesheets when html has no head element" do
+      described_class.register("stylesheets/user/order_history_component", namespace: :user)
+
+      result = described_class.inject_pending_head_stylesheets("<div>fragment</div>", nil)
+
+      expect(result).to eq("<div>fragment</div>")
+      expect(described_class.pending_head_stylesheets?).to be false
+    end
   end
 
   describe ".pending_head_stylesheets?" do

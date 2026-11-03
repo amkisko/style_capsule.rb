@@ -99,16 +99,30 @@ RSpec.describe StyleCapsule::CssProcessor do
       expect(result).to include('[data-capsule="abc123"] .item::before')
     end
 
-    it "handles @keyframes" do
+    # rubocop:disable RSpec/MultipleExpectations -- contract covers steps, percentages, and sibling rules
+    it "leaves @keyframes steps unscoped while scoping sibling rules" do
       css = <<~CSS
         @keyframes fade {
           from { opacity: 0; }
           to { opacity: 1; }
+          50% { opacity: 0.5; }
         }
         .fade { animation: fade 1s; }
       CSS
       result = described_class.scope_selectors(css, "abc123")
-      expect(result).to include("@keyframes")
+      expect(result).to include("@keyframes fade", "from { opacity: 0; }", "to { opacity: 1; }", "50% { opacity: 0.5; }")
+      expect(result).not_to include('[data-capsule="abc123"] from', '[data-capsule="abc123"] to', '[data-capsule="abc123"] 50%')
+      expect(result).to include('[data-capsule="abc123"] .fade')
+    end
+    # rubocop:enable RSpec/MultipleExpectations
+
+    it "leaves single-line @keyframes steps unscoped" do
+      css = "@keyframes fade { from { opacity: 0; } to { opacity: 1; } }\n.fade { animation: fade 1s; }"
+      result = described_class.scope_selectors(css, "abc123")
+      expect(result).to include("from { opacity: 0; }")
+      expect(result).to include("to { opacity: 1; }")
+      expect(result).not_to match(/\[data-capsule="abc123"\]\s*from/)
+      expect(result).not_to match(/\[data-capsule="abc123"\]\s*to/)
       expect(result).to include('[data-capsule="abc123"] .fade')
     end
 
@@ -297,7 +311,7 @@ RSpec.describe StyleCapsule::CssProcessor do
       expect(result).to end_with("\n}")
     end
 
-    it "preserves all CSS content without modification" do
+    it "preserves style rules and nestable at-rules inside the wrapper" do
       css = <<~CSS
         .class { color: red; }
         #id { padding: 10px; }
@@ -313,6 +327,35 @@ RSpec.describe StyleCapsule::CssProcessor do
       expect(result).to include("div.element { margin: 0; }")
       expect(result).to include("@media (max-width: 768px)")
       expect(result).to include(".responsive { display: block; }")
+    end
+
+    it "hoists @keyframes outside the nesting wrapper" do
+      css = <<~CSS
+        @keyframes fade {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .fade { animation: fade 1s; }
+      CSS
+      result = described_class.scope_with_nesting(css, "abc123")
+      keyframes_index = result.index("@keyframes fade")
+      wrapper_index = result.index('[data-capsule="abc123"] {')
+      expect(keyframes_index).to be < wrapper_index
+      expect(result[wrapper_index..]).to include(".fade { animation: fade 1s; }")
+      expect(result[wrapper_index..]).not_to include("@keyframes")
+    end
+
+    it "hoists @font-face outside the nesting wrapper" do
+      css = <<~CSS
+        @font-face {
+          font-family: Example;
+          src: url(example.woff2);
+        }
+        .title { font-family: Example; }
+      CSS
+      result = described_class.scope_with_nesting(css, "abc123")
+      expect(result.index("@font-face")).to be < result.index('[data-capsule="abc123"] {')
+      expect(result).to include(".title { font-family: Example; }")
     end
 
     it "handles empty CSS gracefully" do
