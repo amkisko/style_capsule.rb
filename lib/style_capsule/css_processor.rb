@@ -321,6 +321,8 @@ module StyleCapsule
           return index if depth.zero?
 
           next
+        else
+          # Non-brace characters stay inside the current block.
         end
         index += 1
       end

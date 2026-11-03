@@ -53,7 +53,10 @@ module StyleCapsule
 
       component_class.instance_variable_set(:@_style_capsule_file_cache_warned, true)
       label = component_class.name
+      # Class#name can be nil/empty for anonymous classes; avoid ActiveSupport blank?
+      # rubocop:disable Rails/Blank -- standalone hosts may lack ActiveSupport
       label = component_class.inspect if label.nil? || label.empty?
+      # rubocop:enable Rails/Blank
       warn "[StyleCapsule] :file cache strategy requires class-method component_styles; " \
            "falling back to :none for #{label}"
     end
