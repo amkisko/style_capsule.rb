@@ -77,6 +77,10 @@ module StyleCapsule
     MAX_INLINE_CACHE_ENTRIES = 256
     FALLBACK_LINK_OPTION_NAME = /\A(?:media|title|crossorigin|integrity|nonce|type|id|class|data-[a-zA-Z0-9_-]+)\z/
 
+    # Frozen fragments for non-Rails inline <style> rendering.
+    INLINE_STYLE_OPEN = %(<style type="text/css">)
+    INLINE_STYLE_CLOSE = "</style>"
+
     # Process-wide manifest for static file paths (like Propshaft)
     # Organized by namespace: { namespace => { logical_path => { file_path:, options: } } }
     @manifest = {} # rubocop:disable Style/ClassVars, ThreadSafety/MutableClassInstanceVariable
@@ -118,48 +122,56 @@ module StyleCapsule
         defined?(ActiveSupport::CurrentAttributes) && self < ActiveSupport::CurrentAttributes
       end
 
-      # Get inline stylesheets (thread-local fallback if not using CurrentAttributes)
+      # Get inline stylesheets (CurrentAttributes, thread-local, or experimental Fiber store)
       def inline_stylesheets
-        if using_current_attributes?
-          # When using CurrentAttributes, access the instance attribute
-          # CurrentAttributes automatically provides access to instance attributes
-          inst = instance
-          inst&.inline_stylesheets || {}
+        if use_execution_state_store?
+          ExecutionState[ExecutionState::INLINE_KEY] ||= {}
         else
-          Thread.current[:style_capsule_inline_stylesheets] ||= {}
+          inst = instance
+          return {} unless inst
+
+          inst.inline_stylesheets ||= {}
         end
       end
 
-      # Set inline stylesheets (thread-local fallback if not using CurrentAttributes)
+      # Set inline stylesheets (CurrentAttributes, thread-local, or experimental Fiber store)
       def inline_stylesheets=(value)
-        if using_current_attributes?
-          # When using CurrentAttributes, set via the instance
+        if use_execution_state_store?
+          ExecutionState[ExecutionState::INLINE_KEY] = value
+        else
           inst = instance
           inst.inline_stylesheets = value if inst
-        else
-          Thread.current[:style_capsule_inline_stylesheets] = value
         end
       end
 
-      # Get request-scoped file stylesheets (thread-local fallback if not using CurrentAttributes)
+      # Get request-scoped file stylesheets (CurrentAttributes, thread-local, or experimental Fiber store)
       def request_file_stylesheets
-        if using_current_attributes?
-          inst = instance
-          inst&.request_file_stylesheets || {}
+        if use_execution_state_store?
+          ExecutionState[ExecutionState::REQUEST_FILES_KEY] ||= {}
         else
-          Thread.current[:style_capsule_request_file_stylesheets] ||= {}
+          inst = instance
+          return {} unless inst
+
+          inst.request_file_stylesheets ||= {}
         end
       end
 
-      # Set request-scoped file stylesheets (thread-local fallback if not using CurrentAttributes)
+      # Set request-scoped file stylesheets (CurrentAttributes, thread-local, or experimental Fiber store)
       def request_file_stylesheets=(value)
-        if using_current_attributes?
+        if use_execution_state_store?
+          ExecutionState[ExecutionState::REQUEST_FILES_KEY] = value
+        else
           inst = instance
           inst.request_file_stylesheets = value if inst
-        else
-          Thread.current[:style_capsule_request_file_stylesheets] = value
         end
       end
+
+      # Experimental Fiber mode always uses ExecutionState. Otherwise use thread/Fiber
+      # store when CurrentAttributes is unavailable.
+      def use_execution_state_store?
+        ExecutionState.fiber_mode? || !using_current_attributes?
+      end
+      private :use_execution_state_store?
 
       # Get instance (for CurrentAttributes compatibility)
       def instance
@@ -189,8 +201,12 @@ module StyleCapsule
     # @param namespace [Symbol, String, nil] Namespace identifier
     # @return [Symbol] Normalized namespace
     def self.normalize_namespace(namespace)
-      return DEFAULT_NAMESPACE if namespace.nil? || namespace.to_s.strip.empty?
-      namespace.to_sym
+      return DEFAULT_NAMESPACE if namespace.nil?
+
+      s = namespace.to_s
+      return DEFAULT_NAMESPACE if s.strip.empty?
+
+      s.to_sym
     end
 
     # Register a stylesheet file path during rendering (request-scoped).
@@ -246,10 +262,7 @@ module StyleCapsule
         inline_size: nil,
         cache_strategy: :none
       ) do
-        registry = request_file_stylesheets
-        registry[ns] ||= {}
-        registry[ns][path] = {file_path: path, options: options}
-        self.request_file_stylesheets = registry
+        (request_file_stylesheets[ns] ||= {})[path] = {file_path: path, options: options}
       end
     end
     private_class_method :register_request_file
@@ -327,14 +340,11 @@ module StyleCapsule
         inline_size: final_css.bytesize,
         cache_strategy: cache_strategy
       ) do
-        registry = inline_stylesheets
-        registry[ns] ||= []
-        registry[ns] << {
+        (inline_stylesheets[ns] ||= []) << {
           type: :inline,
           css_content: final_css,
           capsule_id: capsule_id
         }
-        self.inline_stylesheets = registry
       end
 
       # Cache the CSS if strategy is enabled and not already cached
@@ -585,13 +595,18 @@ module StyleCapsule
     # @param namespace [Symbol, String, nil] Optional namespace to render (nil/blank renders all namespaces)
     # @return [String] HTML-safe string with stylesheet tags
     def self.render_stylesheet_entries(stylesheets, view_context)
-      stylesheets.map do |stylesheet|
-        if stylesheet[:type] == :inline
-          render_inline_stylesheet(stylesheet, view_context)
-        else
-          render_file_stylesheet(stylesheet, view_context)
-        end
-      end.join("\n").then { |s| safe_string(s) }
+      buf = +""
+      stylesheets.each_with_index do |stylesheet, i|
+        buf << "\n" if i.positive?
+        piece =
+          if stylesheet[:type] == :inline
+            render_inline_stylesheet(stylesheet, view_context)
+          else
+            render_file_stylesheet(stylesheet, view_context)
+          end
+        buf << piece.to_s
+      end
+      safe_string(buf)
     end
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity -- renders mixed inline and file registrations
@@ -602,7 +617,9 @@ module StyleCapsule
 
         all_stylesheets = merged_file_registrations_all_namespaces
 
-        request_inline_stylesheets.each do |_ns, inline|
+        request_inline_stylesheets.each_value do |inline|
+          next if inline.empty?
+
           all_stylesheets.concat(inline)
         end
 
@@ -837,7 +854,7 @@ module StyleCapsule
     def self.render_inline_stylesheet(stylesheet, _view_context)
       css_content = stylesheet[:css_content]
       CssProcessor.reject_style_element_breakout!(css_content)
-      safe_string(%(<style type="text/css">#{css_content}</style>))
+      safe_string(+(INLINE_STYLE_OPEN + css_content.to_s + INLINE_STYLE_CLOSE))
     end
 
     # Make string HTML-safe (compatible with Rails and non-Rails)

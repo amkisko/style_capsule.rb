@@ -31,7 +31,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "activesupport", ">= 7.0", "< 9.0"  # Optional, recommended for Rails
   spec.add_development_dependency "railties", ">= 7.0", "< 9.0"  # For testing Rails integration
   spec.add_development_dependency "rspec", "~> 3"
-  spec.add_development_dependency "polyrun", ">= 2.2.0"
+  spec.add_development_dependency "polyrun", ">= 2.2.9"
   spec.add_development_dependency "webmock", "~> 3"
   spec.add_development_dependency "rake", "~> 13"
   spec.add_development_dependency "standard", "~> 1.52"

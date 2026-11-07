@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 2.0.4 (2026-11-07)
+
+- Experimental: add `StyleCapsule.isolation_level = :fiber` so request-scoped stylesheet registry state and the helper scope cache isolate per Fiber (`:thread` remains default)
+- Remove temporary benchmark feature toggles; ship the optimized CSS and stylesheet-registry paths as the only behavior
+- `Instrumentation`: skip `ActiveSupport::Notifications` work unless a subscriber exists on the event (hot path avoids notifier setup when nothing listens)
+- `CssProcessor`: skip comment stripping when there are no `/*` comments; fast ASCII whitespace scan in `patch_selectors`; length-before-regex capsule validation; frozen breakout regex; `split(",", -1)` for comma lists; direct nesting output when hoisting at-rules
+- `CssProcessor#patch_selectors`: reuse one `scoped_prefix` buffer; skip comma split/join when a prelude has a single selector
+- `StylesheetRegistry`: append inline styles in place; buffered `<head>` tag rendering; reusable inline `<style>` open/close fragments
+- Maintainer load harness: `benchmarks/load.rb` + `make bench-load` / `make bench-fiber` (wall, CPU, allocations — no library toggles)
+
 ## 2.0.3 (2026-11-03)
 
 - Leave `@keyframes` / `@font-face` / `@property` steps unscoped under selector patching
@@ -100,7 +110,7 @@
 
 - Update ViewComponent dependency to version 4.0 and adjust compatibility in tests
 - Enhance error handling in style_capsule Rake task for ViewComponent loading issues
-- Remove Rails 6 support from Appraisals file and update Rails 7.2 dependencies
+- Remove Rails 6 support from Appraisals file and adjust Rails 7.2 dependencies
 - Update Rails and ActiveSupport version requirements
 - Add Codecov badge to README
 

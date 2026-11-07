@@ -464,6 +464,8 @@ end
 
 The core library is framework-agnostic. Without Rails, use `StyleCapsule::CssProcessor` directly, `StyleCapsule::Component` with Phlex, or `StyleCapsule::StandaloneHelper` for ERB-style templates. The stylesheet registry falls back to thread-local storage when `ActiveSupport::CurrentAttributes` is not loaded.
 
+**Experimental Fiber isolation**: `StyleCapsule.isolation_level = :fiber` isolates request-scoped stylesheet registry state and the helper scope cache per Fiber (for Fiber servers / interleaved Fibers on one Thread). It does **not** flip Rails' own `config.active_support.isolation_level`; Falcon-style apps usually set both.
+
 For setup examples, API notes, and the relationship between `style_capsule` and `stylesheet_registry`, see **[docs/non_rails_support.md](docs/non_rails_support.md)**.
 
 ## How It Works

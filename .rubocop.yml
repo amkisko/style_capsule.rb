@@ -137,11 +137,13 @@ Metrics/CyclomaticComplexity:
   Max: 10
   Exclude:
     - lib/style_capsule/stylesheet_registry.rb
+    - lib/style_capsule/css_processor.rb
 Metrics/PerceivedComplexity:
   Enabled: true
   Max: 10
   Exclude:
     - lib/style_capsule/stylesheet_registry.rb
+    - lib/style_capsule/css_processor.rb
 Metrics/AbcSize:
   Enabled: true
   Max: 15
@@ -149,3 +151,5 @@ Metrics/AbcSize:
   Exclude:
     - spec/support/**/*
     - lib/style_capsule/stylesheet_registry.rb
+    - lib/style_capsule/css_processor.rb
+    - benchmarks/load.rb

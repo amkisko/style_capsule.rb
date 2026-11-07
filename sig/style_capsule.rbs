@@ -1,6 +1,20 @@
 module StyleCapsule
   VERSION: String
 
+  def self.isolation_level: () -> Symbol
+  def self.isolation_level=: (Symbol | String) -> Symbol
+
+  module ExecutionState
+    INLINE_KEY: Symbol
+    REQUEST_FILES_KEY: Symbol
+    SCOPE_CACHE_KEY: Symbol
+
+    def self.fiber_mode?: () -> bool
+    def self.[]: (Symbol key) -> untyped
+    def self.[]=: (Symbol key, untyped value) -> untyped
+    def self.delete: (Symbol key) -> untyped
+  end
+
   module AssetPath
     def self.validate_logical_path!: (String path) -> String
   end

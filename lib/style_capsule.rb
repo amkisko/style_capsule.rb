@@ -95,7 +95,25 @@ end
 #   # Files are automatically precompiled via: bin/rails assets:precompile
 #   # Or manually: bin/rails style_capsule:build
 module StyleCapsule
+  @isolation_level = :thread
+
+  class << self
+    # Request-scoped storage isolation. Default +:thread+. Experimental +:fiber+
+    # isolates stylesheet registry request state and helper scope cache per Fiber.
+    attr_reader :isolation_level
+
+    def isolation_level=(level)
+      normalized = level.to_sym
+      unless %i[thread fiber].include?(normalized)
+        raise ArgumentError, "isolation_level must be :thread or :fiber, got: #{level.inspect}"
+      end
+
+      @isolation_level = normalized
+    end
+  end
+
   require_relative "style_capsule/version"
+  require_relative "style_capsule/execution_state"
   require_relative "style_capsule/instrumentation"
   require_relative "style_capsule/asset_path"
   require_relative "style_capsule/helper_scope_cache"

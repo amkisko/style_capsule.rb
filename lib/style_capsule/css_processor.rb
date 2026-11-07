@@ -18,6 +18,10 @@ module StyleCapsule
     # Maximum CSS content size (1MB) to prevent DoS attacks
     MAX_CSS_SIZE = 1_000_000
 
+    CAPSULE_ID_PATTERN = /\A[a-zA-Z0-9_-]+\z/
+
+    STYLE_ELEMENT_BREAKOUT_PATTERN = %r{</style}i
+
     # At-rules whose inner selectors must not receive attribute scoping
     NON_SCOPING_AT_RULES = %w[keyframes font-face property].freeze
 
@@ -61,7 +65,13 @@ module StyleCapsule
         css_content: css_string
       ) do
         capsule_attr = %([data-capsule="#{capsule_id}"])
-        patch_selectors(strip_comments(css_string.dup), capsule_attr)
+        css_for_patch =
+          if css_string.include?("/*")
+            strip_comments(css_string.dup)
+          else
+            css_string
+          end
+        patch_selectors(css_for_patch, capsule_attr)
       end
     end
 
@@ -105,10 +115,14 @@ module StyleCapsule
       ) do
         capsule_attr = %([data-capsule="#{capsule_id}"])
         hoisted, nestable = hoist_top_level_at_rules(css_string)
-        parts = []
-        parts << hoisted unless hoisted.empty?
-        parts << "#{capsule_attr} {\n#{nestable}\n}" unless nestable.strip.empty?
-        parts.join("\n")
+        nest_stripped = nestable.strip
+        if nest_stripped.empty?
+          hoisted
+        elsif hoisted.empty?
+          "#{capsule_attr} {\n#{nest_stripped}\n}"
+        else
+          "#{hoisted}\n#{capsule_attr} {\n#{nest_stripped}\n}"
+        end
       end
     end
     # rubocop:enable Metrics/AbcSize
@@ -118,6 +132,8 @@ module StyleCapsule
     # @param css [String] CSS content with comments
     # @return [String] CSS content without comments
     def self.strip_comments(css)
+      return css unless css.include?("/*")
+
       css.gsub(/\/\*.*?\*\//m, "")
     end
 
@@ -133,7 +149,7 @@ module StyleCapsule
       # rubocop:disable Rails/Blank -- standalone hosts may lack ActiveSupport
       return if css_string.nil? || css_string.empty?
       # rubocop:enable Rails/Blank
-      return unless css_string.match?(%r{</style}i)
+      return unless css_string.match?(STYLE_ELEMENT_BREAKOUT_PATTERN)
 
       raise ArgumentError, "CSS content must not contain a style element closer"
     end
@@ -151,25 +167,31 @@ module StyleCapsule
         raise ArgumentError, "capsule_id cannot be empty"
       end
 
-      unless capsule_id.match?(/\A[a-zA-Z0-9_-]+\z/)
-        raise ArgumentError, "Invalid capsule_id: must contain only alphanumeric characters, hyphens, and underscores (got: #{capsule_id.inspect})"
-      end
-
       if capsule_id.length > 100
         raise ArgumentError, "Invalid capsule_id: too long (max 100 characters, got #{capsule_id.length})"
+      end
+
+      unless capsule_id.match?(CAPSULE_ID_PATTERN)
+        raise ArgumentError, "Invalid capsule_id: must contain only alphanumeric characters, hyphens, and underscores (got: #{capsule_id.inspect})"
       end
     end
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity -- walks braces and at-rules in one pass
     def self.patch_selectors(css, capsule_attr)
       output = +""
+      # Reuse one prefix string for the common `[data-capsule="..."] ` case to avoid
+      # repeated interpolation when thousands of selectors are comma-split.
+      scoped_prefix = "#{capsule_attr} "
       index = 0
       length = css.length
       brace_depth = 0
       suppress_below_depth = nil
 
       while index < length
-        while index < length && css[index].match?(/\s/)
+        while index < length
+          c = css.getbyte(index)
+          break unless c == 32 || c == 9 || c == 10 || c == 12 || c == 13
+
           output << css[index]
           index += 1
         end
@@ -196,14 +218,14 @@ module StyleCapsule
           next
         end
 
-        selectors = selectors_raw.strip
-        at_name = selectors[/\A@([a-zA-Z-]+)/, 1]&.downcase
+        selectors_for_logic = selectors_raw.strip
+        at_name = selectors_for_logic[/\A@([a-zA-Z-]+)/, 1]&.downcase
         entering_non_scoping = at_name && NON_SCOPING_AT_RULES.include?(at_name) && suppress_below_depth.nil?
 
         skip_scoping = !suppress_below_depth.nil? ||
-          selectors.start_with?("@") ||
-          selectors_raw.include?("[data-capsule=") ||
-          selectors.empty?
+          selectors_for_logic.start_with?("@") ||
+          selectors_for_logic.include?("[data-capsule=") ||
+          selectors_for_logic.empty?
 
         if skip_scoping
           output << selectors_raw
@@ -211,23 +233,41 @@ module StyleCapsule
             suppress_below_depth = brace_depth
           end
         else
-          scoped_selectors = selectors.split(",").map do |selector|
-            selector = selector.strip
-            next selector if selector.empty?
+          selectors_stripped = selectors_for_logic
+          leading = selectors_raw[/\A\s*/]
+          trailing = selectors_raw[/\s*\z/]
 
-            if selector.start_with?(":host")
-              selector
+          if !selectors_stripped.include?(",")
+            sel = selectors_stripped
+            if sel.empty?
+              output << selectors_raw
+            elsif sel.start_with?(":host")
+              patched = sel
                 .gsub(/^:host-context\(([^)]+)\)/, "#{capsule_attr} \\1")
                 .gsub(/^:host\(([^)]+)\)/, "#{capsule_attr}\\1")
                 .gsub(/^:host\b/, capsule_attr)
+              output << "#{leading}#{patched}#{trailing}"
             else
-              "#{capsule_attr} #{selector}"
+              output << "#{leading}#{scoped_prefix}#{sel}#{trailing}"
             end
-          end.join(", ")
+          else
+            piece_ary = selectors_stripped.split(",", -1)
+            scoped_selectors = piece_ary.map do |selector|
+              selector = selector.strip
+              next selector if selector.empty?
 
-          leading = selectors_raw[/\A\s*/]
-          trailing = selectors_raw[/\s*\z/]
-          output << "#{leading}#{scoped_selectors}#{trailing}"
+              if selector.start_with?(":host")
+                selector
+                  .gsub(/^:host-context\(([^)]+)\)/, "#{capsule_attr} \\1")
+                  .gsub(/^:host\(([^)]+)\)/, "#{capsule_attr}\\1")
+                  .gsub(/^:host\b/, capsule_attr)
+              else
+                scoped_prefix + selector
+              end
+            end.join(", ")
+
+            output << "#{leading}#{scoped_selectors}#{trailing}"
+          end
         end
 
         output << "{"

@@ -3,7 +3,8 @@
 require "strscan"
 
 module StyleCapsule
-  # Bounded per-thread cache for scoped CSS from ERB / standalone helpers (avoids unbounded Thread.current growth).
+  # Bounded per-execution-scope cache for scoped CSS from ERB / standalone helpers
+  # (avoids unbounded Thread/Fiber store growth).
   module HelperScopeCache
     MAX_SCOPE_CACHE_ENTRIES = 256
     STYLE_OPEN = %r{<style[^>]*>}im
@@ -49,7 +50,7 @@ module StyleCapsule
       fingerprint = Digest::SHA1.hexdigest(css_content.to_s)
       cache_key = "style_capsule_#{capsule_id}_#{fingerprint}"
 
-      bucket = Thread.current[:style_capsule_scope_cache] ||= {order: [], hash: {}}
+      bucket = ExecutionState[ExecutionState::SCOPE_CACHE_KEY] ||= {order: [], hash: {}}
       hash = bucket[:hash]
       order = bucket[:order]
 

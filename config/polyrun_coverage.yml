@@ -1,0 +1,8 @@
+track_under:
+  - lib
+report_formats:
+  - html
+  - cobertura
+  - console
+reject_patterns:
+  - "/lib/style_capsule/version.rb"

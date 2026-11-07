@@ -65,6 +65,14 @@ end
 
 When `ActiveSupport::CurrentAttributes` is not loaded, `StyleCapsule::StylesheetRegistry` uses thread-local storage for request-scoped inline CSS and render-time file paths. Use `register_eager` for process-wide file paths that should appear on every request (boot or class load). Use `register` during rendering when a component calls `register_stylesheet`.
 
+Experimental Fiber isolation (opt-in; default remains `:thread`):
+
+```ruby
+StyleCapsule.isolation_level = :fiber
+```
+
+With `:fiber`, request-scoped registry state and the helper scope cache live on the current Fiber. This does not change Rails `config.active_support.isolation_level`.
+
 ```ruby
 require "style_capsule"
 
