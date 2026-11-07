@@ -16,13 +16,11 @@ Implementation: `lib/style_capsule/execution_state.rb`, wired from `StylesheetRe
 
 Median of three host samples (`benchmarks/output/fiber_sample_{1,2,3}.log`):
 
-| Series | median ops/s | median wall (s) | alloc |
-| --- | ---: | ---: | ---: |
-| `baseline_fiber_sequential` | 200561.6 | 0.0150 | 81056 |
-| `baseline_fiber_concurrent` | 174286.9 | 0.0172 | 103165 |
-| `baseline_thread_concurrent_fibers` | 162610.4 | 0.0184 | 97118 |
+- `baseline_fiber_sequential`: median ops/s 200561.6, median wall 0.0150 s, alloc 81056
+- `baseline_fiber_concurrent`: median ops/s 174286.9, median wall 0.0172 s, alloc 103165
+- `baseline_thread_concurrent_fibers`: median ops/s 162610.4, median wall 0.0184 s, alloc 97118
 
-Fiber concurrent isolation stays in the same band as the shared-stack `:thread` concurrent Fiber path (about **1.07×** median ops/s). Sequential Fiber register/render remains the fastest of the three series.
+Fiber concurrent isolation stays in the same band as the shared-stack `:thread` concurrent Fiber path (about 1.07x median ops/s). Sequential Fiber register/render remains the fastest of the three series.
 
 ## Next
 

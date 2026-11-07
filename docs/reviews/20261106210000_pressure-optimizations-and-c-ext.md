@@ -12,11 +12,9 @@ Host for cited numbers: Ruby 4.0.x, arm64-darwin. Host-relative, not SLOs.
 
 ## Decision: C extension
 
-**Ship custom C extension: no.**
+Ship custom C extension: no.
 
-| Probe | Ruby median | C median | Ratio | Why not ship |
-| --- | ---: | ---: | ---: | --- |
-| `CssProcessor.patch_selectors` ~259 KiB CSS | **0.0444 s** | simple C prefix **0.00102 s** | ~44× | C stub is not a semantic substitute (`:host`, comments, at-rules, validation). |
+Probe: `CssProcessor.patch_selectors` on about 259 KiB CSS. Ruby median wall 0.0444 s. Simple C prefix median wall 0.00102 s (about 44x). Do not ship: the C stub is not a semantic substitute (`:host`, comments, at-rules, validation).
 
 Throwaway tree: `benchmarks/tmp_c_ext_probe/` (removed after measurement).
 
@@ -28,8 +26,8 @@ Retry custom C only when measurement shows the hot path is (1) a large enough sh
 
 - Work is linear over CSS bytes in one rare boundary call (whole stylesheet in, scoped CSS out).
 - The C implementation is a full semantic substitute for `CssProcessor` (same `:host`, comments, at-rules, validation).
-- End-to-end `scope_selectors` / head-render improvement is clearly above ~20% median wall (n ≥ 3, same load). A prefix-only stub that is ~44× faster is not enough.
-- Profile shows roughly ≥30–40% of time in one tight function before writing `ext/`.
+- End-to-end `scope_selectors` / head-render improvement is clearly above about 20% median wall (n >= 3, same load). A prefix-only stub that is about 44x faster is not enough.
+- Profile shows roughly 30-40% or more of time in one tight function before writing `ext/`.
 
 ### Do not retry when
 
@@ -41,21 +39,21 @@ Retry custom C only when measurement shows the hot path is (1) a large enough sh
 
 1. Load measure: named primary series (`wall_s` / `storage_delta_bytes`) dominates at L1.
 2. Profile: one tight function owns a large fraction of CSS processing time.
-3. Throwaway C probe with the same semantics → only then add `ext/` if median wall drops enough on the full processor probe and tests stay green.
+3. Throwaway C probe with the same semantics, then add `ext/` only if median wall drops enough on the full processor probe and tests stay green.
 
-Short form: retry C for “full CSS byte loop”; skip C for “hashes, notifications, and partial stubs.”
+Short form: retry C for a full CSS byte loop; skip C for hashes, notifications, and partial stubs.
 
 ## Permanent Ruby optimizations (flags removed)
 
-| Optimization | Effect (observed during cooker / load) |
-| --- | --- |
-| Skip `ActiveSupport::Notifications` when no subscribers | Less instrument overhead on CSS path. |
-| Comment strip only if `/*` present | Avoids useless scan. |
-| `patch_selectors`: shared `scoped_prefix`, single-selector fast path, ASCII whitespace loop, `split(",", -1)` | Lower alloc/string churn on large sheets. |
-| Capsule id length check before regex; frozen breakout pattern | Cheaper validation. |
-| Registry in-place updates; buffered head render; frozen `<style>` fragments | Less hash rebuild on register/render. |
+Observed during cooker / load:
 
-`StyleCapsule.pressure_opt` removed; optimized branches are unconditional. Specs: **508** examples green after cleanup.
+- Skip `ActiveSupport::Notifications` when no subscribers: less instrument overhead on CSS path.
+- Comment strip only if `/*` present: avoids useless scan.
+- `patch_selectors`: shared `scoped_prefix`, single-selector fast path, ASCII whitespace loop, `split(",", -1)`: lower alloc/string churn on large sheets.
+- Capsule id length check before regex; frozen breakout pattern: cheaper validation.
+- Registry in-place updates; buffered head render; frozen `<style>` fragments: less hash rebuild on register/render.
+
+`StyleCapsule.pressure_opt` removed; optimized branches are unconditional. Specs: 508 examples green after cleanup.
 
 ## Documentation cleanup
 
