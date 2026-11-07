@@ -28,3 +28,10 @@
 .cursor/mcp.json
 
 .pray
+
+/benchmarks/output/
+
+/benchmarks/tmp_c_ext_probe/
+
+# Local bundle path (e.g. BUNDLE_PATH=vendor/bundle)
+/vendor/bundle/
