@@ -66,7 +66,7 @@ Integration tests verify:
 
 ### Core Principles
 
-- **Always assume RSpec has been integrated** - Never edit `rails_helper.rb` or `spec_helper.rb` or add new testing gems
+- Always assume RSpec has been integrated - Never edit `rails_helper.rb` or `spec_helper.rb` or add new testing gems
 - Focus on testing behavior, not implementation details
 - Keep test scope minimal - start with the most crucial and essential tests
 - Never test features that are built into the Rails framework
@@ -82,17 +82,17 @@ Integration tests verify:
 
 ### Testing Workflow
 
-1. **Plan First**: Think carefully about what tests should be written for the given scope/feature
-2. **Isolate Dependencies**: Use mocks/stubs for external services or Rails-specific functionality
-3. **Minimal Scope**: Start with essential tests, add edge cases only when specifically requested
-4. **DRY Principles**: Review `spec/support/` for existing shared examples and helpers before duplicating code
+1. Plan First: Think carefully about what tests should be written for the given scope/feature
+2. Isolate Dependencies: Use mocks/stubs for external services or Rails-specific functionality
+3. Minimal Scope: Start with essential tests, add edge cases only when specifically requested
+4. DRY Principles: Review `spec/support/` for existing shared examples and helpers before duplicating code
 
 ### Test Data Management
 
 #### Let/Let! Usage
 
-- **`let`**: Lazy evaluation - only creates when accessed; use by default
-- **`let!`**: Eager evaluation - creates immediately; use when laziness causes issues
+- `let`: Lazy evaluation - only creates when accessed; use by default
+- `let!`: Eager evaluation - creates immediately; use when laziness causes issues
 - Keep `let` blocks close to where they're used
 - Avoid creating unused data with `let!`
 
@@ -106,14 +106,14 @@ Since this is a gem library (not a Rails app), test data is typically:
 
 #### Test Output Directory Configuration
 
-**Important**: Tests are configured to use a temporary directory for CSS file writing to avoid creating directories in the project root.
+Important: Tests are configured to use a temporary directory for CSS file writing to avoid creating directories in the project root.
 
 - `CssFileWriter` is automatically configured in `spec_helper.rb` to use a temporary directory (`/tmp/style_capsule_spec_*`)
 - Individual tests that need a specific output directory should configure it explicitly using `Dir.mktmpdir`
 - Tests should clean up their output directories in `after` blocks
 - The test suite automatically cleans up the default test output directory after all tests complete
 
-**Example**:
+Example:
 ```ruby
 RSpec.describe StyleCapsule::CssFileWriter do
   let(:test_output_dir) { Pathname.new(Dir.mktmpdir) }
@@ -153,10 +153,10 @@ end
 
 #### When to Isolate
 
-- Rails-specific functionality (ActionView, Rails::Railtie) → stub or mock
-- External dependencies → stub to avoid requiring full Rails stack
-- Nondeterminism (random, time, UUIDs) → stub to deterministic values
-- Thread-local storage → clear between tests
+- Rails-specific functionality (ActionView, Rails::Railtie) -> stub or mock
+- External dependencies -> stub to avoid requiring full Rails stack
+- Nondeterminism (random, time, UUIDs) -> stub to deterministic values
+- Thread-local storage -> clear between tests
 
 #### When NOT to Isolate
 
@@ -166,18 +166,18 @@ end
 
 #### Isolation Techniques
 
-- **Verifying Doubles**: Prefer `instance_double`, `class_double` over plain `double` to catch interface mismatches
-- **Stubs**: `allow(obj).to receive(:method).and_return(value)` for replacing behavior
-- **Spies**: `expect(obj).to have_received(:method).with(args)` for verifying side effects
-- **Time Stubs**: Use `travel_to` or `Timecop` for deterministic time-dependent tests
-- **Sequential Returns**: `and_return(value1, value2)` for modeling retries and fallbacks
+- Verifying Doubles: Prefer `instance_double`, `class_double` over plain `double` to catch interface mismatches
+- Stubs: `allow(obj).to receive(:method).and_return(value)` for replacing behavior
+- Spies: `expect(obj).to have_received(:method).with(args)` for verifying side effects
+- Time Stubs: Use `travel_to` or `Timecop` for deterministic time-dependent tests
+- Sequential Returns: `and_return(value1, value2)` for modeling retries and fallbacks
 
 #### Isolation Rules
 
-1. **Preserve Public Behavior**: Test via public API, never test private methods directly
-2. **Scope Narrowly**: Keep stubs local to examples; avoid global state and `allow_any_instance_of`
-3. **Use Verifying Doubles**: Prefer `instance_double`, `class_double` over plain doubles
-4. **Assert Outcomes**: Focus on behavior, not internal call choreography
+1. Preserve Public Behavior: Test via public API, never test private methods directly
+2. Scope Narrowly: Keep stubs local to examples; avoid global state and `allow_any_instance_of`
+3. Use Verifying Doubles: Prefer `instance_double`, `class_double` over plain doubles
+4. Assert Outcomes: Focus on behavior, not internal call choreography
 
 ### Example Test Patterns
 

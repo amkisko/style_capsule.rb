@@ -1,6 +1,6 @@
 # style_capsule
 
-[![Gem Version](https://badge.fury.io/rb/style_capsule.svg?v=2.0.3)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/amkisko/style_capsule.rb/graph/badge.svg?token=2U6NXJOVVM)](https://app.codecov.io/github/amkisko/style_capsule.rb)
+[![Gem Version](https://badge.fury.io/rb/style_capsule.svg?v=2.0.4)](https://badge.fury.io/rb/style_capsule) [![Test Status](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml/badge.svg)](https://github.com/amkisko/style_capsule.rb/actions/workflows/test.yml) [![codecov](https://codecov.io/gh/amkisko/style_capsule.rb/graph/badge.svg?token=2U6NXJOVVM)](https://app.codecov.io/github/amkisko/style_capsule.rb)
 
 CSS scoping for Ruby components. Attribute selectors encapsulate styles for Phlex, ViewComponent, and ERB so rules stay inside the component wrapper. Works with Rails and standalone in other Ruby frameworks (Sinatra, Hanami, and similar) or plain Ruby. Cache strategies: none, time-based, custom proc, and file-based.
 
@@ -84,7 +84,7 @@ end
 <% end %>
 ```
 
-**With custom wrapper tag:**
+With custom wrapper tag:
 
 ```erb
 <%= style_capsule(tag: :section) do %>
@@ -99,18 +99,18 @@ end
 
 StyleCapsule supports two CSS scoping strategies:
 
-1. **Selector Patching (default)**: Adds `[data-capsule="..."]` prefix to each selector
+1. Selector Patching (default): Adds `[data-capsule="..."]` prefix to each selector
    - Better browser support (all modern browsers)
    - Output: `[data-capsule="abc123"] .section { color: red; }`
 
-2. **CSS Nesting (optional)**: Wraps nestable rules in `[data-capsule="..."] { ... }`
+2. CSS Nesting (optional): Wraps nestable rules in `[data-capsule="..."] { ... }`
    - Skips per-selector rewrite; hoists `@keyframes` / `@font-face` and similar to top level
    - Requires CSS nesting support (Chrome 112+, Firefox 117+, Safari 16.5+)
    - Output: `[data-capsule="abc123"] { .section { color: red; } }`
 
 ### Configuration
 
-**Per-component (using `style_capsule` - recommended):**
+Per-component (using `style_capsule` - recommended):
 
 ```ruby
 class MyComponent < ApplicationComponent
@@ -119,7 +119,7 @@ class MyComponent < ApplicationComponent
 end
 ```
 
-**With custom wrapper tag:**
+With custom wrapper tag:
 
 ```ruby
 class MyComponent < ApplicationComponent
@@ -128,7 +128,7 @@ class MyComponent < ApplicationComponent
 end
 ```
 
-**Global (in base component class):**
+Global (in base component class):
 
 ```ruby
 class ApplicationComponent < Phlex::HTML
@@ -137,7 +137,7 @@ class ApplicationComponent < Phlex::HTML
 end
 ```
 
-**Note:** If you change the strategy and it doesn't take effect, clear the CSS cache:
+Note: If you change the strategy and it doesn't take effect, clear the CSS cache:
 
 ```ruby
 MyComponent.clear_css_cache
@@ -196,20 +196,20 @@ head do
 end
 ```
 
-**Namespace Isolation:** Using namespaces prevents stylesheet leakage between different application contexts. For example, login pages can use `namespace: :login`, ActiveAdmin can use `namespace: :active_admin`, and user components can use `namespace: :user`. Each namespace is rendered separately, improving caching efficiency and preventing style conflicts.
+Namespace Isolation: Using namespaces prevents stylesheet leakage between different application contexts. For example, login pages can use `namespace: :login`, ActiveAdmin can use `namespace: :active_admin`, and user components can use `namespace: :user`. Each namespace is rendered separately, improving caching efficiency and preventing style conflicts.
 
 ### Registering Stylesheet Files
 
 You can also register external stylesheet files (not inline CSS) for head rendering. When a component has a configured namespace via `style_capsule`, you don't need to specify it every time:
 
-**In ERB:**
+In ERB:
 
 ```erb
 <% register_stylesheet("stylesheets/user/my_component", "data-turbo-track": "reload") %>
 <% register_stylesheet("stylesheets/admin/dashboard", namespace: :admin) %>
 ```
 
-**In Phlex (requires including `StyleCapsule::PhlexHelper`):**
+In Phlex (requires including `StyleCapsule::PhlexHelper`):
 
 ```ruby
 class UserComponent < ApplicationComponent
@@ -227,7 +227,7 @@ class UserComponent < ApplicationComponent
 end
 ```
 
-**In ViewComponent (requires including `StyleCapsule::ViewComponentHelper`):**
+In ViewComponent (requires including `StyleCapsule::ViewComponentHelper`):
 
 ```ruby
 class UserComponent < ApplicationComponent
@@ -245,7 +245,7 @@ end
 
 Registered files are rendered via `stylesheet_registry_tags` in your layout, just like inline CSS. The namespace is automatically used from the component's `style_capsule` configuration when not explicitly specified.
 
-**Boot-time file paths:** register static paths once with `StyleCapsule::StylesheetRegistry.register_eager(...)` (initializers, class load). Use `register` / `register_stylesheet` during rendering for request-scoped paths.
+Boot-time file paths: register static paths once with `StyleCapsule::StylesheetRegistry.register_eager(...)` (initializers, class load). Use `register` / `register_stylesheet` during rendering for request-scoped paths.
 
 ### Late head injection (Rails)
 
@@ -290,11 +290,11 @@ style_capsule cache_strategy: ->(css, capsule_id, namespace) {
 }
 ```
 
-**Note:** `cache_strategy` accepts Symbol (`:time`), String (`"time"`), or Proc. Strings are automatically converted to symbols.
+Note: `cache_strategy` accepts Symbol (`:time`), String (`"time"`), or Proc. Strings are automatically converted to symbols.
 
 ### File-Based Caching (HTTP Caching)
 
-Writes CSS to files for HTTP caching. **Requires class method `def self.component_styles`**:
+Writes CSS to files for HTTP caching. Requires class method `def self.component_styles`:
 
 ```ruby
 class MyComponent < ApplicationComponent
@@ -310,7 +310,7 @@ class MyComponent < ApplicationComponent
 end
 ```
 
-**Configuration:**
+Configuration:
 
 ```ruby
 # config/initializers/style_capsule.rb
@@ -323,9 +323,9 @@ StyleCapsule::CssFileWriter.configure(
 )
 ```
 
-**Fallback Directory:** When the primary output directory is not writable (for example a read-only app tree in a container), writes go under a per-user directory in `Dir.tmpdir`. If that write also fails, rendering uses inline CSS.
+Fallback Directory: When the primary output directory is not writable (for example a read-only app tree in a container), writes go under a per-user directory in `Dir.tmpdir`. If that write also fails, rendering uses inline CSS.
 
-**Precompilation:**
+Precompilation:
 
 ```bash
 bin/rails style_capsule:build  # Build CSS files
@@ -334,7 +334,7 @@ bin/rails style_capsule:clear  # Clear generated files
 
 Files are automatically built during `bin/rails assets:precompile`.
 
-**Compatibility:** The stylesheet registry works with Propshaft, Sprockets, and other Rails asset bundlers. Static file paths are collected in a process-wide manifest (similar to Propshaft's approach), while inline CSS is stored per-request.
+Compatibility: The stylesheet registry works with Propshaft, Sprockets, and other Rails asset bundlers. Static file paths are collected in a process-wide manifest (similar to Propshaft's approach), while inline CSS is stored per-request.
 
 ## Instrumentation
 
@@ -435,7 +435,7 @@ class Theme < ApplicationRecord
 end
 ```
 
-**Usage:**
+Usage:
 
 ```erb
 <div data-capsule="<%= theme.capsule_id %>">
@@ -458,22 +458,22 @@ end
 - Rails >= 7.0, < 9.0 (optional, for Rails integration)
 - ActiveSupport >= 7.0, < 9.0 (optional, for Rails integration)
 
-**Note**: The gem can be used without Rails! See [Non-Rails Support](#non-rails-support) below.
+Note: The gem works without Rails. See [Non-Rails Support](#non-rails-support) below.
 
 ## Non-Rails Support
 
 The core library is framework-agnostic. Without Rails, use `StyleCapsule::CssProcessor` directly, `StyleCapsule::Component` with Phlex, or `StyleCapsule::StandaloneHelper` for ERB-style templates. The stylesheet registry falls back to thread-local storage when `ActiveSupport::CurrentAttributes` is not loaded.
 
-**Experimental Fiber isolation**: `StyleCapsule.isolation_level = :fiber` isolates request-scoped stylesheet registry state and the helper scope cache per Fiber (for Fiber servers / interleaved Fibers on one Thread). It does **not** flip Rails' own `config.active_support.isolation_level`; Falcon-style apps usually set both.
+Experimental Fiber isolation: `StyleCapsule.isolation_level = :fiber` isolates request-scoped stylesheet registry state and the helper scope cache per Fiber (for Fiber servers / interleaved Fibers on one Thread). It does not flip Rails' own `config.active_support.isolation_level`; Falcon-style apps usually set both.
 
-For setup examples, API notes, and the relationship between `style_capsule` and `stylesheet_registry`, see **[docs/non_rails_support.md](docs/non_rails_support.md)**.
+For setup examples, API notes, and the relationship between `style_capsule` and `stylesheet_registry`, see [docs/non_rails_support.md](docs/non_rails_support.md).
 
 ## How It Works
 
-1. **Scope ID Generation**: Each component class gets a unique scope ID based on its class name (shared across all instances)
-2. **CSS Rewriting**: CSS selectors gain `[data-capsule="..."]` attribute selectors (or a nesting wrapper)
-3. **HTML Wrapping**: Component content is wrapped in a scoped element
-4. **Class names**: Class names in CSS and markup stay as written
+1. Scope ID Generation: Each component class gets a unique scope ID based on its class name (shared across all instances)
+2. CSS Rewriting: CSS selectors gain `[data-capsule="..."]` attribute selectors (or a nesting wrapper)
+3. HTML Wrapping: Component content is wrapped in a scoped element
+4. Class names: Class names in CSS and markup stay as written
 
 ## Development
 

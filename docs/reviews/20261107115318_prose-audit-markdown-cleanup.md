@@ -1,4 +1,4 @@
-# Prose audit: markdown cleanup in docs timestamp trees
+# Prose audit: markdown cleanup
 
 ## Participants
 
@@ -6,27 +6,36 @@ Andrei Makarov (@amkisko)
 
 ## Decisions
 
-Apply writing-prose / AGENTS rules to `docs/` timestamp trees: plain prose readable without a rendered preview. No markdown tables, bold, italic, or other styling. Prefer ASCII punctuation (`x`, `->`, `>=`, straight quotes).
-
-Out of scope for this pass: README.md and CHANGELOG.md (not timestamp trees; product/changelog markdown remains). Permanent `docs/non_rails_support.md` left unchanged.
+Apply writing-prose / AGENTS plain-prose rules beyond docs timestamp trees for product and maintainer markdown that still used bold, italic, or non-ASCII punctuation for emphasis. Keep headings, lists, links, badges, and fenced code. Prefer ASCII punctuation (`-`, `->`, `>=`, straight quotes).
 
 ## Effects
 
-Cleaned:
+Timestamp trees (earlier in this note's first cut):
 
-- `docs/reviews/20261107114500_fiber-isolation-experimental.md`: replaced median sample table with labelled bullets; removed bold and multiplication-sign glyph (`1.07x`).
-- `docs/reviews/20261106210000_pressure-optimizations-and-c-ext.md`: replaced C-probe and optimization tables with prose and bullets; removed bold, Unicode arrow, curly quotes, and `>=` / `x` glyphs.
+- `docs/reviews/20261107114500_fiber-isolation-experimental.md`: labelled bullets instead of a median table; no bold or multiplication-sign glyph.
+- `docs/reviews/20261106210000_pressure-optimizations-and-c-ext.md`: prose and bullets instead of C-probe and optimization tables; no bold, Unicode arrow, curly quotes, or comparison glyphs.
 
-Scan after edit: no markdown tables, bold/italic markers, or banned Unicode punctuation remain under `docs/**/*.md`.
+Extended pass:
+
+- `README.md`: removed bold labels and emphasis; gem badge query bumped to 2.0.4; softened the "without Rails" note.
+- `CHANGELOG.md`: replaced em dash in the 2.0.4 load-harness bullet with ASCII `-`.
+- `spec/README.md`: removed bold guideline labels.
+- `.github/pull_request_template.md`: removed italic intro and bold checklist labels.
+
+Already clean (no change): `docs/non_rails_support.md`, `SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `GOVERNANCE.md`, `LICENSE.md`, `rfcs/README.md`.
 
 ## Next
 
-- Prefer labelled lists for numeric series in future review notes.
-- Optional later: separate README tone pass if product docs should drop section bold.
+- Keep new docs notes in labelled lists rather than tables.
+- Leave badge images and hyperlinks as the only non-prose chrome in README.
 
 ## Source
 
 - AGENTS.md Writing and changelog prose checks
 - writing-prose skill
+- `README.md`
+- `CHANGELOG.md`
+- `spec/README.md`
+- `.github/pull_request_template.md`
 - `docs/reviews/20261107114500_fiber-isolation-experimental.md`
 - `docs/reviews/20261106210000_pressure-optimizations-and-c-ext.md`
